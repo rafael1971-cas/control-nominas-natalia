@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, Clock, Moon, Sun, Award, DollarSign, FileText, 
-  Settings, RefreshCw, CheckCircle2, AlertCircle, Trash2, Edit3, 
-  ChevronLeft, ChevronRight, Download, ShieldCheck
+  Calendar, Moon, Sun, Award, FileText, 
+  Settings, CheckCircle2, ChevronLeft, ChevronRight, ShieldCheck
 } from 'lucide-react';
 
 interface DayEntry {
@@ -30,17 +29,17 @@ export default function PayrollApp() {
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
 
+  // Añadidas las constantes por día trabajadas
   const [defaultRates, setDefaultRates] = useState({
     normal: 11.70,
     night: 12.50,
     festive: 17.90,
+    incentivoDia: 0.948,
+    vacacionesDia: 4.569,
+    ppExtraDia: 9.1575,
   });
 
-  const [incentivo, setIncentivo] = useState<number>(18.96);
-  const [vacacionesExtra, setVacacionesExtra] = useState<number>(91.38);
-  const [ppExtra, setPpExtra] = useState<number>(183.15);
   const [irpfPercent, setIrpfPercent] = useState<number>(2.0);
-
   const [allData, setAllData] = useState<AllMonthsData>({});
   const [activeTab, setActiveTab] = useState<'daily' | 'summary' | 'settings'>('daily');
   const [savedMessage, setSavedMessage] = useState<boolean>(false);
@@ -116,7 +115,12 @@ export default function PayrollApp() {
     }
   }
 
-  const grossTotal = totalNormalAmount + totalNightAmount + totalFestiveAmount + Number(incentivo) + Number(vacacionesExtra) + Number(ppExtra);
+  // Cálculos automáticos de los conceptos extra por día trabajado
+  const totalIncentivo = totalDaysWorked * defaultRates.incentivoDia;
+  const totalVacaciones = totalDaysWorked * defaultRates.vacacionesDia;
+  const totalPPExtra = totalDaysWorked * defaultRates.ppExtraDia;
+
+  const grossTotal = totalNormalAmount + totalNightAmount + totalFestiveAmount + totalIncentivo + totalVacaciones + totalPPExtra;
   const totalSS = grossTotal * (0.047 + 0.016 + 0.001 + 0.0015);
   const irpfAmount = grossTotal * (irpfPercent / 100);
   const totalDeducir = totalSS + irpfAmount;
@@ -209,16 +213,31 @@ export default function PayrollApp() {
       {activeTab === 'summary' && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
           <h2 className="text-2xl font-bold text-slate-800">Nómina de {monthNames[selectedMonth - 1]} {selectedYear}</h2>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-50 p-4 rounded-xl border"><div className="text-xs text-slate-500 font-semibold">Normales</div><div className="text-2xl font-bold">{totalNormalHours.toFixed(1)} h</div><div className="text-sm font-semibold text-indigo-600">{totalNormalAmount.toFixed(2)} €</div></div>
             <div className="bg-slate-50 p-4 rounded-xl border"><div className="text-xs text-slate-500 font-semibold">Nocturnas</div><div className="text-2xl font-bold">{totalNightHours.toFixed(1)} h</div><div className="text-sm font-semibold text-indigo-600">{totalNightAmount.toFixed(2)} €</div></div>
             <div className="bg-slate-50 p-4 rounded-xl border"><div className="text-xs text-slate-500 font-semibold">Festivas</div><div className="text-2xl font-bold">{totalFestiveHours.toFixed(1)} h</div><div className="text-sm font-semibold text-indigo-600">{totalFestiveAmount.toFixed(2)} €</div></div>
           </div>
-          <div className="bg-indigo-50/50 p-4 rounded-xl border flex gap-4">
-            <div><label className="text-xs font-medium text-slate-600">Incentivo</label><input type="number" value={incentivo} onChange={(e) => setIncentivo(parseFloat(e.target.value) || 0)} className="w-full bg-white px-3 py-1.5 border rounded-lg text-sm font-semibold" /></div>
-            <div><label className="text-xs font-medium text-slate-600">Vacaciones</label><input type="number" value={vacacionesExtra} onChange={(e) => setVacacionesExtra(parseFloat(e.target.value) || 0)} className="w-full bg-white px-3 py-1.5 border rounded-lg text-sm font-semibold" /></div>
-            <div><label className="text-xs font-medium text-slate-600">P.P. Extra</label><input type="number" value={ppExtra} onChange={(e) => setPpExtra(parseFloat(e.target.value) || 0)} className="w-full bg-white px-3 py-1.5 border rounded-lg text-sm font-semibold" /></div>
+
+          <div className="bg-indigo-50/50 p-5 rounded-xl border border-indigo-100">
+            <h3 className="text-sm font-bold text-indigo-900 mb-3">Conceptos Fijos (Autocalculados por los {totalDaysWorked} días trabajados)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="text-xs font-semibold text-slate-500">Incentivo ({defaultRates.incentivoDia}€/día)</div>
+                <div className="text-lg font-bold text-slate-800">{totalIncentivo.toFixed(2)} €</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="text-xs font-semibold text-slate-500">Vacaciones ({defaultRates.vacacionesDia}€/día)</div>
+                <div className="text-lg font-bold text-slate-800">{totalVacaciones.toFixed(2)} €</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="text-xs font-semibold text-slate-500">P.P. Extra ({defaultRates.ppExtraDia}€/día)</div>
+                <div className="text-lg font-bold text-slate-800">{totalPPExtra.toFixed(2)} €</div>
+              </div>
+            </div>
           </div>
+
           <div className="bg-slate-900 text-white p-6 rounded-2xl space-y-4">
             <div className="flex justify-between"><span>Total Bruto:</span><span className="font-bold">{grossTotal.toFixed(2)} €</span></div>
             <div className="flex justify-between text-xs text-slate-400"><span>- Seg. Social (~6.45%):</span><span>-{totalSS.toFixed(2)} €</span></div>
@@ -235,12 +254,23 @@ export default function PayrollApp() {
       )}
 
       {activeTab === 'settings' && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-          <h2 className="text-xl font-bold text-slate-800">Precios Genéricos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div><label className="text-sm font-bold">Normal (€/h)</label><input type="number" step="0.01" value={defaultRates.normal} onChange={(e) => saveRates({ ...defaultRates, normal: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
-            <div><label className="text-sm font-bold">Nocturna (€/h)</label><input type="number" step="0.01" value={defaultRates.night} onChange={(e) => saveRates({ ...defaultRates, night: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
-            <div><label className="text-sm font-bold">Festiva (€/h)</label><input type="number" step="0.01" value={defaultRates.festive} onChange={(e) => saveRates({ ...defaultRates, festive: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-8">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Precios de Horas</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div><label className="text-sm font-bold text-slate-600">Normal (€/h)</label><input type="number" step="0.01" value={defaultRates.normal} onChange={(e) => saveRates({ ...defaultRates, normal: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+              <div><label className="text-sm font-bold text-slate-600">Nocturna (€/h)</label><input type="number" step="0.01" value={defaultRates.night} onChange={(e) => saveRates({ ...defaultRates, night: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+              <div><label className="text-sm font-bold text-slate-600">Festiva (€/h)</label><input type="number" step="0.01" value={defaultRates.festive} onChange={(e) => saveRates({ ...defaultRates, festive: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+            </div>
+          </div>
+          
+          <div className="pt-6 border-t border-slate-100">
+            <h2 className="text-xl font-bold text-slate-800 mb-4">Conceptos Fijos por Día Trabajado</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div><label className="text-sm font-bold text-slate-600">Incentivo (€/día)</label><input type="number" step="0.001" value={defaultRates.incentivoDia} onChange={(e) => saveRates({ ...defaultRates, incentivoDia: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+              <div><label className="text-sm font-bold text-slate-600">Vacaciones (€/día)</label><input type="number" step="0.001" value={defaultRates.vacacionesDia} onChange={(e) => saveRates({ ...defaultRates, vacacionesDia: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+              <div><label className="text-sm font-bold text-slate-600">P.P. Extra (€/día)</label><input type="number" step="0.001" value={defaultRates.ppExtraDia} onChange={(e) => saveRates({ ...defaultRates, ppExtraDia: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2 border rounded-xl font-bold" /></div>
+            </div>
           </div>
         </div>
       )}
