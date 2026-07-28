@@ -4,13 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Moon, Sun, Award, FileText, 
   Settings, CheckCircle2, ChevronLeft, ChevronRight, ShieldCheck, Heart,
-  Lock, AlertCircle, FileSpreadsheet, Eye, EyeOff, Delete, Calculator
+  Lock, AlertCircle, FileSpreadsheet, Eye, EyeOff, Delete, Calculator, Clock
 } from 'lucide-react';
 
 interface DayEntry {
   normalHours: number;
   nightHours: number;
-  festiveHours: number;
+  extraHours: number;
+  extraNightHours: number;
   worked: boolean;
 }
 
@@ -27,13 +28,12 @@ export default function PayrollApp() {
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
 
-  // Estados de navegación
   const [appState, setAppState] = useState<'splash' | 'login' | 'app'>('splash');
   const [pinCode, setPinCode] = useState('');
   const [pinError, setPinError] = useState(false);
   const [showPin, setShowPin] = useState(false);
 
-  // PRECIOS EXACTOS EXTRAÍDOS DE LAS NÓMINAS
+  // PRECIOS EXACTOS (ETT)
   const [defaultRates, setDefaultRates] = useState({
     salarioBase: 9.1133,
     vacaciones: 0.8270,
@@ -83,7 +83,8 @@ export default function PayrollApp() {
     return {
       normalHours: 0,
       nightHours: 0,
-      festiveHours: 0,
+      extraHours: 0,
+      extraNightHours: 0,
       worked: false,
     };
   };
@@ -114,39 +115,44 @@ export default function PayrollApp() {
   let totalNormalHours = 0;
   let totalNightHours = 0;
   let totalExtraHours = 0;
+  let totalExtraNightHours = 0;
 
   for (let d = 1; d <= daysInCurrentMonth; d++) {
     const entry = getDayEntry(d);
-    if (entry.worked || entry.normalHours > 0 || entry.nightHours > 0 || entry.festiveHours > 0) {
+    if (entry.worked || entry.normalHours > 0 || entry.nightHours > 0 || entry.extraHours > 0 || entry.extraNightHours > 0) {
       totalDaysWorked++;
       totalNormalHours += Number(entry.normalHours) || 0;
       totalNightHours += Number(entry.nightHours) || 0;
-      totalExtraHours += Number(entry.festiveHours) || 0;
+      totalExtraHours += Number(entry.extraHours) || 0;
+      totalExtraNightHours += Number(entry.extraNightHours) || 0;
     }
   }
 
-  // Las horas nocturnas también suman como base para salario, vacaciones y extras
-  const totalBaseHours = totalNormalHours + totalNightHours;
-
   const round2 = (num: number) => Math.round(num * 100) / 100;
 
+  const totalBaseHours = totalNormalHours + totalNightHours;
   const salarioBaseAmount = round2(totalBaseHours * defaultRates.salarioBase);
   const vacacionesAmount = round2(totalBaseHours * defaultRates.vacaciones);
   const ppExtraAmount = round2(totalBaseHours * defaultRates.ppExtra);
   const nocturnidadAmount = round2(totalNightHours * defaultRates.plusNocturnidad);
-  const extrasAmount = round2(totalExtraHours * defaultRates.precioExtra);
   
-  const grossTotal = round2(salarioBaseAmount + vacacionesAmount + ppExtraAmount + nocturnidadAmount + extrasAmount + Number(incentivoMensual));
+  // Cálculo de extras (Diurnas vs Nocturnas)
+  const precioExtraNoche = defaultRates.precioExtra + defaultRates.plusNocturnidad;
+  const extrasAmount = round2(totalExtraHours * defaultRates.precioExtra);
+  const extrasNightAmount = round2(totalExtraNightHours * precioExtraNoche);
+  const totalDineroExtras = extrasAmount + extrasNightAmount;
 
-  // Cálculo estricto de Seguridad Social
-  const baseSS = round2(grossTotal - extrasAmount); // CC y MEI no incluyen horas extras
+  const grossTotal = round2(salarioBaseAmount + vacacionesAmount + ppExtraAmount + nocturnidadAmount + totalDineroExtras + Number(incentivoMensual));
+
+  // Seguridad Social
+  const baseSS = round2(grossTotal - totalDineroExtras); // CC y MEI NO incluyen horas extras
   const baseDesempleo = grossTotal; // Desempleo y FP incluyen todo
 
   const cc = round2(baseSS * 0.047);
   const mei = round2(baseSS * 0.0015);
   const desempleo = round2(baseDesempleo * 0.016);
   const fp = round2(baseDesempleo * 0.001);
-  const heSS = round2(extrasAmount * 0.047);
+  const heSS = round2(totalDineroExtras * 0.047);
 
   const irpf = round2(grossTotal * (irpfPercent / 100));
 
@@ -305,35 +311,37 @@ export default function PayrollApp() {
               <table className="w-full text-left border-collapse min-w-max">
                 <thead>
                   <tr className="bg-slate-800 text-white text-xs uppercase tracking-widest text-center">
-                    <th className="py-5 px-4 font-bold border-b border-slate-700">Día</th>
-                    <th className="py-5 px-4 font-bold border-b border-slate-700">Normales (h)</th>
-                    <th className="py-5 px-4 font-bold border-b border-slate-700">Nocturnas (h)</th>
-                    <th className="py-5 px-4 font-bold border-b border-slate-700">Horas Extras (h)</th>
-                    <th className="py-5 px-6 font-bold border-b border-slate-700 bg-slate-900">Total Día</th>
+                    <th className="py-5 px-3 font-bold border-b border-slate-700">Día</th>
+                    <th className="py-5 px-3 font-bold border-b border-slate-700 text-sky-300">Normales</th>
+                    <th className="py-5 px-3 font-bold border-b border-slate-700 text-indigo-300">Nocturnas</th>
+                    <th className="py-5 px-3 font-bold border-b border-slate-700 text-purple-300">Ext. Día</th>
+                    <th className="py-5 px-3 font-bold border-b border-slate-700 text-fuchsia-300">Ext. Noche</th>
+                    <th className="py-5 px-4 font-bold border-b border-slate-700 bg-slate-900 text-amber-400">Total Día</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {Array.from({ length: daysInCurrentMonth }, (_, i) => i + 1).map((day) => {
                     const entry = getDayEntry(day);
                     
-                    // Calculamos el dinero de este día específico
                     const hNormales = Number(entry.normalHours) || 0;
                     const hNocturnas = Number(entry.nightHours) || 0;
-                    const hExtras = Number(entry.festiveHours) || 0;
+                    const hExtraDia = Number(entry.extraHours) || 0;
+                    const hExtraNoche = Number(entry.extraNightHours) || 0;
                     const hBaseDia = hNormales + hNocturnas;
                     
                     const diaBase = hBaseDia * defaultRates.salarioBase;
                     const diaVac = hBaseDia * defaultRates.vacaciones;
                     const diaPPE = hBaseDia * defaultRates.ppExtra;
                     const diaNoct = hNocturnas * defaultRates.plusNocturnidad;
-                    const diaExtr = hExtras * defaultRates.precioExtra;
-                    const dayTotal = diaBase + diaVac + diaPPE + diaNoct + diaExtr;
+                    const diaExtr = hExtraDia * defaultRates.precioExtra;
+                    const diaExtrNoche = hExtraNoche * precioExtraNoche;
                     
+                    const dayTotal = diaBase + diaVac + diaPPE + diaNoct + diaExtr + diaExtrNoche;
                     const isWeekend = new Date(selectedYear, selectedMonth - 1, day).getDay() === 0 || new Date(selectedYear, selectedMonth - 1, day).getDay() === 6;
                     
                     return (
                       <tr key={day} className={`hover:bg-amber-50 transition-colors text-center ${isWeekend ? 'bg-slate-50' : ''}`}>
-                        <td className="py-4 px-4">
+                        <td className="py-4 px-3">
                           <div className="flex items-center justify-center gap-3">
                             <span className={`w-10 h-10 inline-flex items-center justify-center rounded-full text-base font-black shadow-sm ${entry.worked ? 'bg-amber-400 text-slate-900 border-2 border-amber-500' : 'bg-slate-200 text-slate-500'}`}>
                               {day}
@@ -343,10 +351,11 @@ export default function PayrollApp() {
                             </span>
                           </div>
                         </td>
-                        <td className="py-4 px-4"><input type="number" step="0.5" value={entry.normalHours || ''} onChange={(e) => updateDayEntry(day, 'normalHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-24 px-4 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
-                        <td className="py-4 px-4"><input type="number" step="0.5" value={entry.nightHours || ''} onChange={(e) => updateDayEntry(day, 'nightHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-24 px-4 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
-                        <td className="py-4 px-4"><input type="number" step="0.5" value={entry.festiveHours || ''} onChange={(e) => updateDayEntry(day, 'festiveHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-24 px-4 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
-                        <td className="py-4 px-6 font-black text-slate-800 text-xl bg-slate-50/50">
+                        <td className="py-4 px-2"><input type="number" step="0.5" value={entry.normalHours || ''} onChange={(e) => updateDayEntry(day, 'normalHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 md:w-20 px-2 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
+                        <td className="py-4 px-2"><input type="number" step="0.5" value={entry.nightHours || ''} onChange={(e) => updateDayEntry(day, 'nightHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 md:w-20 px-2 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
+                        <td className="py-4 px-2"><input type="number" step="0.5" value={entry.extraHours || ''} onChange={(e) => updateDayEntry(day, 'extraHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 md:w-20 px-2 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
+                        <td className="py-4 px-2"><input type="number" step="0.5" value={entry.extraNightHours || ''} onChange={(e) => updateDayEntry(day, 'extraNightHours', parseFloat(e.target.value) || 0)} placeholder="0" className="w-16 md:w-20 px-2 py-3 border-2 border-slate-200 rounded-xl text-center font-black text-slate-800 focus:border-amber-400 focus:ring-0 outline-none transition-all shadow-inner" /></td>
+                        <td className="py-4 px-4 font-black text-slate-800 text-lg bg-slate-50/50">
                           {dayTotal > 0 ? `${dayTotal.toFixed(2)} €` : '-'}
                         </td>
                       </tr>
@@ -358,35 +367,58 @@ export default function PayrollApp() {
           </div>
         )}
 
-        {/* TAB 2: RESUMEN DE NÓMINA EXACTO */}
+        {/* TAB 2: RESUMEN EXACTO */}
         {activeTab === 'summary' && (
           <div className="bg-slate-50 p-6 md:p-10 rounded-3xl border border-slate-200 space-y-8">
             <h2 className="text-4xl font-black text-center text-slate-800 mb-8 pb-6 border-b-2 border-slate-200">
               Cálculo Exacto de <span className="text-amber-500">{monthNames[selectedMonth - 1]}</span>
             </h2>
             
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+              <div className="bg-white p-4 rounded-2xl border-2 border-sky-100 shadow-sm text-center">
+                <Sun className="w-6 h-6 text-sky-500 mx-auto mb-2" />
+                <div className="text-xs text-slate-400 font-bold uppercase">Normales</div>
+                <div className="text-2xl font-black text-slate-800">{totalNormalHours.toFixed(1)}h</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border-2 border-indigo-100 shadow-sm text-center">
+                <Moon className="w-6 h-6 text-indigo-500 mx-auto mb-2" />
+                <div className="text-xs text-slate-400 font-bold uppercase">Nocturnas</div>
+                <div className="text-2xl font-black text-slate-800">{totalNightHours.toFixed(1)}h</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border-2 border-purple-100 shadow-sm text-center">
+                <Clock className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                <div className="text-xs text-slate-400 font-bold uppercase">Ext. Día</div>
+                <div className="text-2xl font-black text-slate-800">{totalExtraHours.toFixed(1)}h</div>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border-2 border-fuchsia-100 shadow-sm text-center">
+                <Award className="w-6 h-6 text-fuchsia-500 mx-auto mb-2" />
+                <div className="text-xs text-slate-400 font-bold uppercase">Ext. Noche</div>
+                <div className="text-2xl font-black text-slate-800">{totalExtraNightHours.toFixed(1)}h</div>
+              </div>
+            </div>
+
             <div className="bg-white p-6 rounded-3xl border-2 border-slate-200 shadow-sm">
-              <h3 className="font-black text-slate-800 mb-6 uppercase tracking-widest flex items-center gap-2"><Calculator className="w-6 h-6 text-amber-500"/> Ingresos Desglosados</h3>
+              <h3 className="font-black text-slate-800 mb-6 uppercase tracking-widest flex items-center gap-2"><Calculator className="w-6 h-6 text-amber-500"/> Desglose Económico</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100">
-                  <div className="text-xs font-bold text-slate-500 uppercase">Salario Base ({totalBaseHours}h)</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">Salario Base</div>
                   <div className="text-2xl font-black text-slate-800">{salarioBaseAmount.toFixed(2)} €</div>
                 </div>
                 <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100">
-                  <div className="text-xs font-bold text-slate-500 uppercase">Vacaciones ({totalBaseHours}h)</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">Vacaciones</div>
                   <div className="text-2xl font-black text-slate-800">{vacacionesAmount.toFixed(2)} €</div>
                 </div>
                 <div className="p-4 bg-sky-50 rounded-2xl border border-sky-100">
-                  <div className="text-xs font-bold text-slate-500 uppercase">P.P. Extra ({totalBaseHours}h)</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">P.P. Extra</div>
                   <div className="text-2xl font-black text-slate-800">{ppExtraAmount.toFixed(2)} €</div>
                 </div>
                 <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
-                  <div className="text-xs font-bold text-slate-500 uppercase">Plus Nocturnidad ({totalNightHours}h)</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">Plus Nocturnidad</div>
                   <div className="text-2xl font-black text-slate-800">{nocturnidadAmount.toFixed(2)} €</div>
                 </div>
                 <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
-                  <div className="text-xs font-bold text-slate-500 uppercase">Horas Extras ({totalExtraHours}h)</div>
-                  <div className="text-2xl font-black text-slate-800">{extrasAmount.toFixed(2)} €</div>
+                  <div className="text-xs font-bold text-slate-500 uppercase">Total H. Extras</div>
+                  <div className="text-2xl font-black text-slate-800">{totalDineroExtras.toFixed(2)} €</div>
                 </div>
                 <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 shadow-inner">
                   <div className="text-xs font-bold text-amber-700 uppercase mb-1">Incentivo Manual</div>
@@ -462,10 +494,11 @@ export default function PayrollApp() {
               </div>
 
               <div className="mt-12 bg-amber-50 border-2 border-amber-200 rounded-3xl p-6 flex flex-col items-center justify-center text-center">
-                <span className="text-amber-800 font-bold mb-2">Resumen de precios reales (Suma automática)</span>
+                <span className="text-amber-800 font-bold mb-4 uppercase tracking-widest text-sm">Resumen de precios calculados</span>
                 <div className="flex flex-wrap justify-center gap-6">
-                  <div className="text-xl"><span className="font-bold text-slate-500">Hora Normal:</span> <span className="font-black text-slate-800">{precioHoraNormalCalculado.toFixed(2)} €</span></div>
-                  <div className="text-xl"><span className="font-bold text-slate-500">Hora Nocturna:</span> <span className="font-black text-slate-800">{precioHoraNocturnaCalculada.toFixed(2)} €</span></div>
+                  <div className="text-xl bg-white px-4 py-2 rounded-xl shadow-sm"><span className="font-bold text-slate-500">Hora Normal:</span> <span className="font-black text-slate-800">{precioHoraNormalCalculado.toFixed(2)} €</span></div>
+                  <div className="text-xl bg-white px-4 py-2 rounded-xl shadow-sm"><span className="font-bold text-slate-500">Hora Nocturna:</span> <span className="font-black text-slate-800">{precioHoraNocturnaCalculada.toFixed(2)} €</span></div>
+                  <div className="text-xl bg-white px-4 py-2 rounded-xl shadow-sm"><span className="font-bold text-slate-500">Extra Noche:</span> <span className="font-black text-slate-800">{precioExtraNoche.toFixed(2)} €</span></div>
                 </div>
               </div>
             </div>
