@@ -12,6 +12,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
+      <head>
+        {/* ESTA ES LA LÍNEA MÁGICA QUE FUERZA LOS COLORES Y EL DISEÑO */}
+        <script src="https://cdn.tailwindcss.com"></script>
+      </head>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         {children}
       </body>
