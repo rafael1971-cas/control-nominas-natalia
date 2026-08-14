@@ -5,30 +5,30 @@ export default function HorarioPDF() {
     { d: 1, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 2, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 3, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
-    { d: 4, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Sábado' },
-    { d: 5, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Domingo' },
+    { d: 4, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 5, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
     { d: 6, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 7, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 8, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 9, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 10, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
-    { d: 11, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Sábado' },
-    { d: 12, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Domingo' },
+    { d: 11, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 12, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
     { d: 13, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 14, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 15, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 16, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
     { d: 17, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
-    { d: 18, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Sábado' },
-    { d: 19, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Domingo' },
+    { d: 18, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 19, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
     { d: 20, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
-    { d: 21, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 21, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 22, e: '05:00', s: '13:45', h: 8, n: 1, ext: 0, obs: '' },
     { d: 23, e: '05:00', s: '14:45', h: 9, n: 1, ext: 1, obs: '1h Extra' },
     { d: 24, e: '05:00', s: '14:45', h: 9, n: 1, ext: 1, obs: '1h Extra' },
-    { d: 25, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Sábado' },
-    { d: 26, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Domingo' },
-    { d: 27, e: '13:45', s: '23:30', h: 9, n: 1.5, ext: 1, obs: '1h Extra' },
+    { d: 25, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 26, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
+    { d: 27, e: '13:45', s: '23:30', h: 9, n: 0.5, ext: 1, obs: '1h Extra' },
     { d: 28, e: '13:45', s: '23:30', h: 9, n: 0.5, ext: 1, obs: '1h Extra' },
     { d: 29, e: '-', s: '-', h: 0, n: 0, ext: 0, obs: 'Descanso' },
     { d: 30, e: '13:45', s: '22:30', h: 8, n: 0.5, ext: 0, obs: '' },
@@ -75,8 +75,8 @@ export default function HorarioPDF() {
       <div style={{ marginTop: '20px', padding: '15px', border: '2px solid black', backgroundColor: '#f8fafc' }}>
         <h3 style={{ margin: '0 0 10px 0' }}>RESUMEN TOTAL DEL MES</h3>
         <ul style={{ margin: 0 }}>
-          <li><strong>Días trabajados:</strong> 21 días</li>
-          <li><strong>Total Horas Ordinarias:</strong> 166 horas</li>
+          <li><strong>Días trabajados:</strong> 22 días</li>
+          <li><strong>Total Horas Ordinarias:</strong> 174 horas</li>
           <li><strong>Total Horas Extras:</strong> 4 horas</li>
           <li><strong>Total Horas Plus Nocturnidad:</strong> 15,5 horas</li>
         </ul>
