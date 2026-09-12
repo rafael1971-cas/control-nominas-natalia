@@ -5,13 +5,14 @@ const NOMBRES_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "J
 
 export default function AppNominas() {
   const [isClient, setIsClient] = useState(false);
-  const [tab, setTab] = useState('fichaje'); 
-  const [mesActual, setMesActual] = useState(7); // Lo arranco en 7 = Agosto para que lo vea directo
+  const [tab, setTab] = useState('nomina'); // Lo arranco en nómina para que veas el cambio
+  const [mesActual, setMesActual] = useState(7); // Agosto
   const [anioActual, setAnioActual] = useState(2026);
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
   const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
+  const [ingresoBanco, setIngresoBanco] = useState<string>(""); // Nuevo estado para lo que cobra real
 
   useEffect(() => {
     setIsClient(true);
@@ -24,10 +25,11 @@ export default function AppNominas() {
         if (parsed.diasData) loadedData = parsed.diasData;
         if (parsed.precios) setPrecios(parsed.precios);
         if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
+        if (parsed.ingresoBanco !== undefined) setIngresoBanco(parsed.ingresoBanco);
       } catch(e){}
     }
 
-    // 🔥 INYECCIÓN MÁGICA DE JULIO 🔥
+    // INYECCIÓN DE JULIO
     const julioRescate: Record<string, any> = {
       "2026-6-1": { h: "8", n: "0.5" }, "2026-6-2": { h: "8", n: "0.5" }, "2026-6-3": { h: "8", n: "0.5" },
       "2026-6-6": { h: "8", n: "1" }, "2026-6-7": { h: "8", n: "1" }, "2026-6-8": { h: "8", n: "1" }, "2026-6-9": { h: "8", n: "1" }, "2026-6-10": { h: "8", n: "1" },
@@ -36,45 +38,32 @@ export default function AppNominas() {
       "2026-6-27": { h: "8", n: "0.5", en: "1" }, "2026-6-28": { h: "8", n: "0.5", en: "1" }, "2026-6-30": { h: "8", n: "0.5" }, "2026-6-31": { h: "6" }
     };
 
-    // 🔥 INYECCIÓN MÁGICA DE AGOSTO (Basada en las nóminas de CRIT) 🔥
-    // Total a cuadrar: 160.83 horas base, 17.67 nocturnidad, 4 extras de día (asumimos extra de día al no tener nocturnidad el segundo tramo)
+    // INYECCIÓN EXACTA DE AGOSTO
     const agostoRescate: Record<string, any> = {
-      // Semana 1
       "2026-7-3": { h: "8", n: "1.76" }, "2026-7-4": { h: "8", n: "1.76" }, "2026-7-5": { h: "8", n: "1.76" }, "2026-7-6": { h: "8", n: "1.76" }, "2026-7-7": { h: "8", n: "1.76" },
-      // Semana 2
-      "2026-7-10": { h: "8", n: "1.76" }, "2026-7-11": { h: "8", n: "1.76" }, "2026-7-12": { h: "8", n: "1.76" }, "2026-7-13": { h: "8", n: "1.76" }, "2026-7-14": { h: "8", n: "1.76" },
-      // Semana 3 (Aquí metemos las 4 horas extras del primer tramo)
-      "2026-7-17": { h: "8", ed: "2" }, "2026-7-18": { h: "8", ed: "2" }, "2026-7-19": { h: "8" }, "2026-7-20": { h: "8" }, "2026-7-21": { h: "8.83" }, 
-      // Semana 4 (Segundo tramo, 48 horas limpias = 6 días de 8 horas)
+      "2026-7-10": { h: "8", n: "1.76" }, "2026-7-11": { h: "8", n: "1.76" }, "2026-7-12": { h: "8", n: "1.76" }, "2026-7-13": { h: "8", n: "1.76" }, "2026-7-14": { h: "8", n: "1.83" },
+      "2026-7-17": { h: "8", ed: "2" }, "2026-7-18": { h: "8", ed: "2" }, "2026-7-19": { h: "8" }, "2026-7-20": { h: "8" }, "2026-7-21": { h: "0.83" }, 
       "2026-7-24": { h: "8" }, "2026-7-25": { h: "8" }, "2026-7-26": { h: "8" }, "2026-7-27": { h: "8" }, "2026-7-28": { h: "8" }, "2026-7-31": { h: "8" }
     };
 
     const finalData = { ...loadedData };
     
-    // Inyectamos Julio si está vacío
-    Object.keys(julioRescate).forEach(key => {
-      const d = finalData[key];
-      if (!d || (!d.h && !d.n && !d.ed && !d.en)) {
-        finalData[key] = julioRescate[key];
-      }
+    // Limpieza de Agosto antiguo
+    Object.keys(finalData).forEach(key => {
+      if (key.startsWith("2026-7-")) delete finalData[key];
     });
 
-    // Inyectamos Agosto si está vacío
-    Object.keys(agostoRescate).forEach(key => {
-      const d = finalData[key];
-      if (!d || (!d.h && !d.n && !d.ed && !d.en)) {
-        finalData[key] = agostoRescate[key];
-      }
-    });
+    Object.keys(julioRescate).forEach(key => { if (!finalData[key]) finalData[key] = julioRescate[key]; });
+    Object.keys(agostoRescate).forEach(key => { finalData[key] = agostoRescate[key]; });
 
     setDiasData(finalData);
   }, []);
 
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual }));
+      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual, ingresoBanco }));
     }
-  }, [diasData, precios, incentivoManual, isClient]);
+  }, [diasData, precios, incentivoManual, ingresoBanco, isClient]);
 
   const cambiarMes = (direccion: number) => {
     let nuevoMes = mesActual + direccion;
@@ -83,6 +72,7 @@ export default function AppNominas() {
     if (nuevoMes < 0) { nuevoMes = 11; nuevoAnio--; }
     setMesActual(nuevoMes);
     setAnioActual(nuevoAnio);
+    setIngresoBanco(""); // Borra lo introducido en el banco al cambiar de mes
   };
 
   const diasDelMes = new Date(anioActual, mesActual + 1, 0).getDate();
@@ -102,12 +92,7 @@ export default function AppNominas() {
         (Number(datosDia.en) || 0) * precios.extNoche
     );
 
-    diasRender.push({
-      diaNum: i,
-      clave: diaClave,
-      datos: datosDia,
-      totalEuros: totalDiaEuros
-    });
+    diasRender.push({ diaNum: i, clave: diaClave, datos: datosDia, totalEuros: totalDiaEuros });
   }
 
   const updateDia = (clave: string, campo: string, valor: string) => {
@@ -132,21 +117,48 @@ export default function AppNominas() {
       }
   });
 
+  // --- CÁLCULOS REALES DE NÓMINA ---
   const incentivoFinal = Number(incentivoManual) || 0;
   const salarioBruto = totalSalarioMes + incentivoFinal;
-  const retencion = salarioBruto * 0.02; 
-  const salarioNeto = salarioBruto - retencion;
+  
+  // Descuentos desglosados (2% IRPF + 6.55% Seguridad Social)
+  const retencionIRPF = salarioBruto * 0.02;
+  const retencionSS = salarioBruto * 0.0655;
+  const salarioNetoCalculado = salarioBruto - retencionIRPF - retencionSS;
+
+  // --- LÓGICA DE COLORES DE LA COMPROBACIÓN ---
+  const ingresoNum = Number(ingresoBanco) || 0;
+  const diferencia = ingresoNum - salarioNetoCalculado;
+  
+  let colorFondo = "bg-gray-100";
+  let colorTexto = "text-gray-500";
+  let mensajeComparacion = "Introduce arriba lo cobrado para comprobar";
+
+  if (ingresoBanco !== "") {
+    if (Math.abs(diferencia) <= 1.00) { // Damos 1 euro de margen por redondeos
+      colorFondo = "bg-green-100 border-green-500";
+      colorTexto = "text-green-700";
+      mensajeComparacion = "✅ ¡TODO CORRECTO! Te han pagado lo que tocaba.";
+    } else if (diferencia < -1.00) {
+      colorFondo = "bg-red-100 border-red-500";
+      colorTexto = "text-red-700";
+      mensajeComparacion = `❌ ¡FALTAN ${Math.abs(diferencia).toFixed(2)} €! Reclama a la ETT.`;
+    } else if (diferencia > 1.00) {
+      colorFondo = "bg-blue-100 border-blue-500";
+      colorTexto = "text-blue-700";
+      mensajeComparacion = `🔵 ¡TE SOBRAN ${Math.abs(diferencia).toFixed(2)} €! Has cobrado de más.`;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
-      
       <div className="bg-[#111827] text-white p-6 rounded-b-3xl shadow-lg max-w-2xl mx-auto">
         <div className="text-center mb-4 text-xs font-bold text-yellow-500 bg-gray-800 inline-block px-3 py-1 rounded-full border border-gray-700 uppercase tracking-widest mx-auto block w-max">
           Panel de Control
         </div>
         <h1 className="text-3xl font-bold text-center mb-6">Horas de Natalia <span className="text-yellow-500">🛡️</span></h1>
         
-        <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700">
+        <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700 mt-6">
           <button onClick={() => cambiarMes(-1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full active:scale-90">&lt;</button>
           <span className="font-bold text-lg tracking-widest text-yellow-400">{NOMBRES_MESES[mesActual]} {anioActual}</span>
           <button onClick={() => cambiarMes(1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full active:scale-90">&gt;</button>
@@ -213,46 +225,63 @@ export default function AppNominas() {
         )}
 
         {tab === 'nomina' && (
-          <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-gray-100">
+          <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-100">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">Resumen Nómina: {NOMBRES_MESES[mesActual]}</h2>
             
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border">
-                <span className="text-gray-500 font-semibold uppercase text-sm">Total Horas/Turnos</span>
-                <span className="font-bold text-lg text-gray-800">{totalSalarioMes.toFixed(2)} €</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                <span className="text-gray-500 font-semibold uppercase text-xs">Total Horas Trabajadas</span>
+                <span className="font-bold text-md text-gray-800">{totalSalarioMes.toFixed(2)} €</span>
               </div>
 
-              <div className="flex justify-between items-center p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-                <div className="flex flex-col">
-                    <span className="text-yellow-700 font-bold uppercase text-sm">Incentivo Mensual</span>
-                    <span className="text-[10px] text-yellow-600">(Manual)</span>
-                </div>
+              <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <span className="text-yellow-700 font-bold uppercase text-xs">Incentivo Producción</span>
                 <div className="flex items-center">
-                    <input 
-                        type="number" 
-                        value={incentivoManual} 
-                        onChange={(e) => setIncentivoManual(e.target.value)}
-                        className="w-24 text-right border-2 border-yellow-300 bg-white rounded-lg p-2 font-bold text-gray-800 outline-none"
-                    />
-                    <span className="ml-2 font-bold text-yellow-600">€</span>
+                    <input type="number" value={incentivoManual} onChange={(e) => setIncentivoManual(e.target.value)} className="w-20 text-right border-2 border-yellow-300 bg-white rounded-md p-1 font-bold text-gray-800 outline-none" />
+                    <span className="ml-1 font-bold text-yellow-600">€</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border">
-                <span className="text-gray-500 font-semibold uppercase text-sm">Salario Bruto Calculado</span>
-                <span className="font-bold text-xl text-gray-800">{salarioBruto.toFixed(2)} €</span>
+              <div className="flex justify-between items-center p-4 bg-gray-100 rounded-xl border-2 border-gray-300 shadow-sm">
+                <span className="text-gray-800 font-black uppercase text-sm">Salario Bruto (Antes imp.)</span>
+                <span className="font-black text-xl text-gray-900">{salarioBruto.toFixed(2)} €</span>
               </div>
 
-              <div className="flex justify-between items-center p-4 bg-red-50 rounded-xl border border-red-100">
-                <span className="text-red-500 font-semibold uppercase text-sm">Retención IRPF/SS (Aprox)</span>
-                <span className="font-bold text-lg text-red-600">- {retencion.toFixed(2)} €</span>
+              <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100 mt-4">
+                <span className="text-red-500 font-semibold uppercase text-xs">Retención IRPF (2%)</span>
+                <span className="font-bold text-sm text-red-600">- {retencionIRPF.toFixed(2)} €</span>
+              </div>
+
+              <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
+                <span className="text-red-500 font-semibold uppercase text-xs">Seg. Social (Aprox 6.55%)</span>
+                <span className="font-bold text-sm text-red-600">- {retencionSS.toFixed(2)} €</span>
               </div>
             </div>
 
-            <div className="mt-8 bg-[#111827] rounded-2xl p-6 text-center shadow-lg shadow-blue-900/20">
-              <span className="block text-yellow-500 font-bold uppercase tracking-widest text-sm mb-2">Total Neto a Cobrar</span>
-              <span className="text-5xl font-extrabold text-white">{salarioNeto.toFixed(2)} €</span>
+            <div className="mt-6 bg-[#111827] rounded-2xl p-6 text-center shadow-lg">
+              <span className="block text-yellow-500 font-bold uppercase tracking-widest text-xs mb-1">Lo que debería llegar al banco</span>
+              <span className="text-4xl font-extrabold text-white">{salarioNetoCalculado.toFixed(2)} €</span>
             </div>
+
+            {/* SECCIÓN DE COMPROBACIÓN QUE TÚ INVENTASTE */}
+            <div className="mt-8 border-t pt-6">
+              <h3 className="text-center font-bold text-gray-700 mb-4 uppercase tracking-wider text-sm">¿Cuánto te han ingresado?</h3>
+              <div className="flex justify-center mb-4">
+                <input 
+                  type="number" 
+                  placeholder="0.00" 
+                  value={ingresoBanco} 
+                  onChange={(e) => setIngresoBanco(e.target.value)}
+                  className="w-40 text-center border-2 border-blue-400 bg-white rounded-xl p-3 font-black text-blue-900 text-xl outline-none shadow-inner"
+                />
+                <span className="ml-2 font-black text-blue-900 text-2xl self-center">€</span>
+              </div>
+
+              <div className={`p-4 rounded-xl text-center font-bold border-2 transition-colors duration-300 ${colorFondo}`}>
+                <span className={colorTexto}>{mensajeComparacion}</span>
+              </div>
+            </div>
+
           </div>
         )}
 
