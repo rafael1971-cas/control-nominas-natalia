@@ -24,54 +24,34 @@ export default function AppNominas() {
   const [prodSemanal, setProdSemanal] = useState<Record<string, number>>({});
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
-  // --- MÓDULO DE RESCATE DE DATOS ---
+  // --- SISTEMA DE RESCATE (ARTILLERÍA PESADA) ---
+  const [mostrarRescate, setMostrarRescate] = useState(false);
+  const [backups, setBackups] = useState<any[]>([]);
+
   useEffect(() => {
     setIsClient(true);
-    const savedV2 = localStorage.getItem('natalia_nomina_v2');
-    
-    if (savedV2) {
-      // Si ya tiene la versión nueva guardada
-      const parsed = JSON.parse(savedV2);
-      if (parsed.diasData) setDiasData(parsed.diasData);
-      if (parsed.precios) setPrecios(parsed.precios);
-      if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
-      if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
-    } else {
-      // SI ESTÁ VACÍO: Busca la caja fuerte antigua y rescata los datos
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key !== 'natalia_nomina_v2') {
-          try {
-            const oldSaved = localStorage.getItem(key);
-            if (oldSaved) {
-              const parsed = JSON.parse(oldSaved);
-              // Si detecta que son sus horas, las recupera al instante
-              if (parsed && parsed.diasData) {
-                setDiasData(parsed.diasData);
-                if (parsed.precios) setPrecios(parsed.precios);
-                break; // Detiene la búsqueda al encontrar sus datos
-              }
-            }
-          } catch (e) {
-            // Ignora otros archivos del móvil
-          }
-        }
-      }
+    const savedV3 = localStorage.getItem('natalia_nomina_v3');
+    if (savedV3) {
+      try {
+        const parsed = JSON.parse(savedV3);
+        if (parsed.diasData) setDiasData(parsed.diasData);
+        if (parsed.precios) setPrecios(parsed.precios);
+        if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
+        if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
+      } catch(e){}
     }
   }, []);
 
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, prodSemanal, incentivoManual }));
+      localStorage.setItem('natalia_nomina_v3', JSON.stringify({ diasData, precios, prodSemanal, incentivoManual }));
     }
   }, [diasData, precios, prodSemanal, incentivoManual, isClient]);
 
-  // --- Suma automática de productividad ---
   useEffect(() => {
     if (!isClient) return;
     let sumaTotalMes = 0;
     const prefijoMes = `${anioActual}-${mesActual}-`;
-    
     Object.keys(prodSemanal).forEach(key => {
       if (key.startsWith(prefijoMes)) {
         sumaTotalMes += Number(prodSemanal[key]) || 0;
@@ -79,6 +59,38 @@ export default function AppNominas() {
     });
     setIncentivoManual(sumaTotalMes > 0 ? sumaTotalMes.toFixed(2) : "0");
   }, [prodSemanal, anioActual, mesActual]);
+
+  // --- FUNCIONES DEL BOTÓN DEL PÁNICO ---
+  const escanearMovil = () => {
+    const encontrados = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && !key.includes('v3')) { // Ignoramos el actual que está vacío
+        const val = localStorage.getItem(key);
+        encontrados.push({ key, val });
+      }
+    }
+    setBackups(encontrados);
+    setMostrarRescate(true);
+  };
+
+  const restaurarBackup = (val: string) => {
+    try {
+      const parsed = JSON.parse(val);
+      if (parsed && parsed.diasData) {
+        setDiasData(parsed.diasData);
+        if (parsed.precios) setPrecios(parsed.precios);
+        if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
+      } else if (parsed && typeof parsed === 'object') {
+        const hasFechas = Object.keys(parsed).some(k => k.includes('-'));
+        if (hasFechas) setDiasData(parsed);
+      }
+      setMostrarRescate(false);
+      alert("¡DATOS RECUPERADOS CON ÉXITO! Natalia, ya puedes bajar el arma.");
+    } catch (e) {
+      alert("Error al recuperar. Este archivo no parece válido.");
+    }
+  };
 
   const cambiarMes = (direccion: number) => {
     let nuevoMes = mesActual + direccion;
@@ -125,17 +137,11 @@ export default function AppNominas() {
   }
 
   const updateDia = (clave: string, campo: string, valor: string) => {
-    setDiasData(prev => ({
-      ...prev,
-      [clave]: { ...prev[clave], [campo]: valor }
-    }));
+    setDiasData(prev => ({ ...prev, [clave]: { ...prev[clave], [campo]: valor } }));
   };
 
   const updateProdSemanal = (claveSemana: string, valor: string) => {
-    setProdSemanal(prev => ({
-      ...prev,
-      [claveSemana]: Number(valor)
-    }));
+    setProdSemanal(prev => ({ ...prev, [claveSemana]: Number(valor) }));
   };
 
   if (!isClient) return null; 
@@ -158,11 +164,47 @@ export default function AppNominas() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      
+      {/* PANTALLA DE RESCATE SUPERPUESTA */}
+      {mostrarRescate && (
+        <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
+          <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE 🚨</h2>
+          <p className="text-white text-center mb-6 font-bold">Hemos encontrado estas cajas fuertes ocultas en la memoria del móvil. Busca la que tenga datos y pulsa Restaurar.</p>
+          
+          <div className="w-full max-w-lg space-y-4">
+            {backups.map((b, index) => (
+              <div key={index} className="bg-white p-4 rounded-xl shadow-xl border-4 border-red-500">
+                <p className="font-bold text-gray-800 border-b pb-2 mb-2">📦 Archivo encontrado: <span className="text-blue-600">{b.key}</span></p>
+                <p className="text-xs text-gray-500 mb-4 h-12 overflow-hidden">{String(b.val).substring(0, 100)}...</p>
+                <button onClick={() => restaurarBackup(b.val)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg text-lg shadow-lg uppercase">
+                  ✅ Restaurar estos datos
+                </button>
+              </div>
+            ))}
+            {backups.length === 0 && (
+              <div className="bg-white p-6 rounded-xl text-center text-red-600 font-bold">
+                No se han encontrado archivos antiguos en este navegador. ¿Estás en el mismo navegador (Chrome/Safari) que usaste la primera vez?
+              </div>
+            )}
+          </div>
+          
+          <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl">
+            Cancelar y Volver
+          </button>
+        </div>
+      )}
+
+      {/* HEADER PRINCIPAL */}
       <div className="bg-[#111827] text-white p-6 rounded-b-3xl shadow-lg max-w-2xl mx-auto">
         <div className="text-center mb-4 text-xs font-bold text-yellow-500 bg-gray-800 inline-block px-3 py-1 rounded-full border border-gray-700 uppercase tracking-widest mx-auto block w-max">
           Panel de Control
         </div>
         <h1 className="text-3xl font-bold text-center mb-6">Horas de Natalia <span className="text-yellow-500">🛡️</span></h1>
+        
+        {/* BOTÓN DEL PÁNICO */}
+        <button onClick={escanearMovil} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-3 rounded-xl w-full mb-6 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-red-400 flex justify-center items-center gap-2 animate-pulse transition-all">
+          <span className="text-xl">🆘</span> ¿NO VES TUS HORAS? PULSA AQUÍ PARA RECUPERARLAS
+        </button>
         
         <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700">
           <button onClick={() => cambiarMes(-1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full">&lt;</button>
