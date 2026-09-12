@@ -1,17 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 
-// --- Funciones de ayuda ---
-function getISOWeek(date: Date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
 const NOMBRES_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-const NOMBRES_DIAS = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 
 export default function AppNominas() {
   const [isClient, setIsClient] = useState(false);
@@ -21,7 +11,6 @@ export default function AppNominas() {
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
   const [precios, setPrecios] = useState({ ordinaria: 9.38, nocturnidad: 1.5, extDia: 12, extNoche: 14 });
-  const [prodSemanal, setProdSemanal] = useState<Record<string, number>>({});
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
   // --- SISTEMA DE RESCATE (CON TRADUCTOR UNIVERSAL) ---
@@ -36,7 +25,6 @@ export default function AppNominas() {
         const parsed = JSON.parse(savedV3);
         if (parsed.diasData) setDiasData(parsed.diasData);
         if (parsed.precios) setPrecios(parsed.precios);
-        if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
         if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
       } catch(e){}
     }
@@ -44,21 +32,10 @@ export default function AppNominas() {
 
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('natalia_nomina_v3', JSON.stringify({ diasData, precios, prodSemanal, incentivoManual }));
+      localStorage.setItem('natalia_nomina_v3', JSON.stringify({ diasData, precios, incentivoManual }));
     }
-  }, [diasData, precios, prodSemanal, incentivoManual, isClient]);
+  }, [diasData, precios, incentivoManual, isClient]);
 
-  useEffect(() => {
-    if (!isClient) return;
-    let sumaTotalMes = 0;
-    const prefijoMes = `${anioActual}-${mesActual}-`;
-    Object.keys(prodSemanal).forEach(key => {
-      if (key.startsWith(prefijoMes)) {
-        sumaTotalMes += Number(prodSemanal[key]) || 0;
-      }
-    });
-    setIncentivoManual(sumaTotalMes > 0 ? sumaTotalMes.toFixed(2) : "0");
-  }, [prodSemanal, anioActual, mesActual]);
 
   // --- TRADUCTOR DEFINITIVO ---
   const escanearMovil = () => {
@@ -84,7 +61,6 @@ export default function AppNominas() {
       if (parsed && parsed.diasData) {
         setDiasData(parsed.diasData);
         if (parsed.precios) setPrecios(parsed.precios);
-        if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
         recuperadoAlgo = true;
       }
 
@@ -126,7 +102,7 @@ export default function AppNominas() {
       if (recuperadoAlgo) {
         setDiasData(newData);
         setMostrarRescate(false);
-        alert("¡BINGO! Datos antiguos traducidos y restaurados a la perfección. ¡Dile a Rafa que le quites el castigo!");
+        alert("¡BINGO! Datos antiguos traducidos y restaurados a la perfección.");
       } else {
         alert("Esa caja fuerte está vacía. Prueba con otra de la lista.");
       }
@@ -146,22 +122,14 @@ export default function AppNominas() {
   };
 
   const diasDelMes = new Date(anioActual, mesActual + 1, 0).getDate();
-  const semanas = [];
-  let semanaActual: any = null;
+  const diasRender = [];
   let totalDiasTrabajadosMes = 0;
 
   for (let i = 1; i <= diasDelMes; i++) {
-    const fecha = new Date(anioActual, mesActual, i);
-    const numSemana = getISOWeek(fecha);
     const diaClave = `${anioActual}-${mesActual}-${i}`;
     const datosDia = diasData[diaClave] || { h: '', n: '', ed: '', en: '' };
     
     if (Number(datosDia.h) > 0 || Number(datosDia.n) > 0) totalDiasTrabajadosMes++;
-
-    if (!semanaActual || semanaActual.num !== numSemana) {
-      semanaActual = { num: numSemana, claveSemana: `${anioActual}-${mesActual}-${numSemana}`, dias: [] };
-      semanas.push(semanaActual);
-    }
 
     const totalDiaEuros = (
         (Number(datosDia.h) || 0) * precios.ordinaria +
@@ -170,22 +138,16 @@ export default function AppNominas() {
         (Number(datosDia.en) || 0) * precios.extNoche
     );
 
-    semanaActual.dias.push({
+    diasRender.push({
       diaNum: i,
-      nombreDia: NOMBRES_DIAS[fecha.getDay()],
       clave: diaClave,
       datos: datosDia,
-      isWeekend: fecha.getDay() === 0 || fecha.getDay() === 6,
       totalEuros: totalDiaEuros
     });
   }
 
   const updateDia = (clave: string, campo: string, valor: string) => {
     setDiasData(prev => ({ ...prev, [clave]: { ...prev[clave], [campo]: valor } }));
-  };
-
-  const updateProdSemanal = (claveSemana: string, valor: string) => {
-    setProdSemanal(prev => ({ ...prev, [claveSemana]: Number(valor) }));
   };
 
   if (!isClient) return null; 
@@ -213,7 +175,7 @@ export default function AppNominas() {
       {mostrarRescate && (
         <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
           <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE 🚨</h2>
-          <p className="text-white text-center mb-6 font-bold">Busca el archivo "hcsl_payroll_data_v2" y pulsa Restaurar.</p>
+          <p className="text-white text-center mb-6 font-bold">Busca el archivo de datos y pulsa Restaurar.</p>
           
           <div className="w-full max-w-lg space-y-4">
             {backups.map((b, index) => (
@@ -272,21 +234,14 @@ export default function AppNominas() {
               <div>Total Día</div>
             </div>
 
-            {semanas.map((semana) => (
-              <div key={semana.num} className="mb-8 border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                
-                <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 text-gray-700">
-                    <span className="font-extrabold text-sm uppercase tracking-wider">🗓️ Semana del año: <span className="text-blue-600">{semana.num}</span></span>
-                </div>
-
-                {semana.dias.map((d: any) => (
-                  <div key={d.diaNum} className={`grid grid-cols-2 md:grid-cols-6 gap-2 p-3 items-center border-b border-gray-50 ${d.isWeekend ? 'bg-gray-50/50' : 'bg-white'} hover:bg-yellow-50/30 transition-colors`}>
+            <div className="border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                {diasRender.map((d: any) => (
+                  <div key={d.diaNum} className={`grid grid-cols-2 md:grid-cols-6 gap-2 p-3 items-center border-b border-gray-50 bg-white hover:bg-yellow-50/30 transition-colors`}>
                     
                     <div className="flex items-center space-x-3 col-span-2 md:col-span-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${d.isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-yellow-400 text-gray-900 shadow-sm'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-yellow-400 text-gray-900 shadow-sm`}>
                         {d.diaNum}
                       </div>
-                      <span className={`font-bold text-xs ${d.isWeekend ? 'text-gray-400' : 'text-gray-500'}`}>{d.nombreDia}</span>
                     </div>
 
                     <div className="flex flex-col md:block">
@@ -311,25 +266,7 @@ export default function AppNominas() {
                     </div>
                   </div>
                 ))}
-
-                <div className="bg-yellow-50 p-4 border-t-2 border-yellow-200 flex flex-col md:flex-row justify-between items-center gap-3">
-                  <div className="text-yellow-800 font-bold text-sm">
-                    ✨ Bono de Productividad (Semana {semana.num})
-                  </div>
-                  <div className="flex items-center">
-                    <input 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={prodSemanal[semana.claveSemana] || ''} 
-                      onChange={(e) => updateProdSemanal(semana.claveSemana, e.target.value)}
-                      className="w-24 text-right border-2 border-yellow-300 rounded-lg p-2 font-bold text-gray-800 focus:border-yellow-500 focus:ring-0 outline-none shadow-inner"
-                    />
-                    <span className="ml-2 font-bold text-yellow-700">€</span>
-                  </div>
-                </div>
-
-              </div>
-            ))}
+            </div>
           </div>
         )}
 
@@ -346,7 +283,7 @@ export default function AppNominas() {
               <div className="flex justify-between items-center p-4 bg-yellow-50 rounded-xl border border-yellow-200">
                 <div className="flex flex-col">
                     <span className="text-yellow-700 font-bold uppercase text-sm">Incentivo Mensual</span>
-                    <span className="text-[10px] text-yellow-600">(Suma automática de semanas o manual)</span>
+                    <span className="text-[10px] text-yellow-600">(Manual)</span>
                 </div>
                 <div className="flex items-center">
                     <input 
