@@ -10,7 +10,6 @@ export default function AppNominas() {
   const [anioActual, setAnioActual] = useState(2026);
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
-  // PRECIOS ACTUALIZADOS SEGÚN NÓMINA CRIT JUNIO 2026
   const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
@@ -19,10 +18,12 @@ export default function AppNominas() {
 
   useEffect(() => {
     setIsClient(true);
-    const savedV3 = localStorage.getItem('natalia_nomina_v3');
-    if (savedV3) {
+    // VAMOS A LEER LA CAJA FUERTE QUE ESTABA USANDO NATALIA ANTES DE LA VERSIÓN DE SEMANAS
+    const saved = localStorage.getItem('natalia_nomina_v2'); 
+    
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedV3);
+        const parsed = JSON.parse(saved);
         if (parsed.diasData) setDiasData(parsed.diasData);
         if (parsed.precios) setPrecios(parsed.precios);
         if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
@@ -32,7 +33,8 @@ export default function AppNominas() {
 
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('natalia_nomina_v3', JSON.stringify({ diasData, precios, incentivoManual }));
+      // GUARDAMOS EN LA MISMA CAJA FUERTE (v2) PARA NO PERDER EL ENLACE CON SUS DATOS
+      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual }));
     }
   }, [diasData, precios, incentivoManual, isClient]);
 
@@ -40,7 +42,8 @@ export default function AppNominas() {
     const encontrados = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && !key.includes('v3')) { 
+      // AHORA MOSTRAMOS TODOS LOS ARCHIVOS QUE NO SEAN EL ACTUAL (v2)
+      if (key && !key.includes('v2')) { 
         const val = localStorage.getItem(key);
         encontrados.push({ key, val });
       }
@@ -98,7 +101,7 @@ export default function AppNominas() {
         setMostrarRescate(false);
         alert("¡BINGO! Datos antiguos traducidos y restaurados a la perfección.");
       } else {
-        alert("Esa caja fuerte está vacía. Prueba con otra de la lista.");
+        alert("Esa caja fuerte está vacía o no tiene formato válido.");
       }
 
     } catch (e) {
@@ -144,7 +147,6 @@ export default function AppNominas() {
     setDiasData(prev => ({ ...prev, [clave]: { ...prev[clave], [campo]: valor } }));
   };
 
-  // --- BOTÓN PARA RESETEAR A PRECIOS DE FÁBRICA ---
   const resetearPrecios = () => {
       setPrecios({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
       alert("Precios restaurados a la nómina de CRIT.");
@@ -185,6 +187,11 @@ export default function AppNominas() {
                 </button>
               </div>
             ))}
+            {backups.length === 0 && (
+              <div className="bg-white p-6 rounded-xl text-center text-red-600 font-bold">
+                No hay otros archivos de respaldo en este navegador, los datos actuales se están leyendo de 'natalia_nomina_v2'.
+              </div>
+            )}
           </div>
           
           <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl">
@@ -334,7 +341,6 @@ export default function AppNominas() {
                 </div>
               ))}
             </div>
-            {/* NUEVO BOTON PARA FORZAR LOS PRECIOS REALES SI HACE FALTA */}
             <button onClick={resetearPrecios} className="mt-6 w-full text-blue-600 font-bold p-3 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
               🔄 Restaurar precios oficiales de la nómina
             </button>
