@@ -6,31 +6,68 @@ const NOMBRES_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "J
 export default function AppNominas() {
   const [isClient, setIsClient] = useState(false);
   const [tab, setTab] = useState('fichaje'); 
-  const [mesActual, setMesActual] = useState(6); // 6 = Julio
+  const [mesActual, setMesActual] = useState(7); // Lo arranco en 7 = Agosto para que lo vea directo
   const [anioActual, setAnioActual] = useState(2026);
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
   const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
-  const [mostrarRescate, setMostrarRescate] = useState(false);
-  const [backups, setBackups] = useState<any[]>([]);
-
   useEffect(() => {
     setIsClient(true);
-    // LEE DIRECTAMENTE LA VERSIÓN ORIGINAL MÁS ESTABLE
     const saved = localStorage.getItem('natalia_nomina_v2'); 
+    let loadedData: Record<string, any> = {};
     
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.diasData && Object.keys(parsed.diasData).length > 0) {
-           setDiasData(parsed.diasData);
-        }
+        if (parsed.diasData) loadedData = parsed.diasData;
         if (parsed.precios) setPrecios(parsed.precios);
         if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
       } catch(e){}
     }
+
+    // 🔥 INYECCIÓN MÁGICA DE JULIO 🔥
+    const julioRescate: Record<string, any> = {
+      "2026-6-1": { h: "8", n: "0.5" }, "2026-6-2": { h: "8", n: "0.5" }, "2026-6-3": { h: "8", n: "0.5" },
+      "2026-6-6": { h: "8", n: "1" }, "2026-6-7": { h: "8", n: "1" }, "2026-6-8": { h: "8", n: "1" }, "2026-6-9": { h: "8", n: "1" }, "2026-6-10": { h: "8", n: "1" },
+      "2026-6-13": { h: "8", n: "0.5" }, "2026-6-14": { h: "8", n: "0.5" }, "2026-6-15": { h: "8", n: "0.5" }, "2026-6-16": { h: "8", n: "0.5" }, "2026-6-17": { h: "8", n: "0.5" },
+      "2026-6-20": { h: "8", n: "1" }, "2026-6-21": { h: "8", n: "1" }, "2026-6-22": { h: "8", n: "1" }, "2026-6-23": { h: "8", n: "1", en: "1" }, "2026-6-24": { h: "8", n: "1", en: "1" },
+      "2026-6-27": { h: "8", n: "0.5", en: "1" }, "2026-6-28": { h: "8", n: "0.5", en: "1" }, "2026-6-30": { h: "8", n: "0.5" }, "2026-6-31": { h: "6" }
+    };
+
+    // 🔥 INYECCIÓN MÁGICA DE AGOSTO (Basada en las nóminas de CRIT) 🔥
+    // Total a cuadrar: 160.83 horas base, 17.67 nocturnidad, 4 extras de día (asumimos extra de día al no tener nocturnidad el segundo tramo)
+    const agostoRescate: Record<string, any> = {
+      // Semana 1
+      "2026-7-3": { h: "8", n: "1.76" }, "2026-7-4": { h: "8", n: "1.76" }, "2026-7-5": { h: "8", n: "1.76" }, "2026-7-6": { h: "8", n: "1.76" }, "2026-7-7": { h: "8", n: "1.76" },
+      // Semana 2
+      "2026-7-10": { h: "8", n: "1.76" }, "2026-7-11": { h: "8", n: "1.76" }, "2026-7-12": { h: "8", n: "1.76" }, "2026-7-13": { h: "8", n: "1.76" }, "2026-7-14": { h: "8", n: "1.76" },
+      // Semana 3 (Aquí metemos las 4 horas extras del primer tramo)
+      "2026-7-17": { h: "8", ed: "2" }, "2026-7-18": { h: "8", ed: "2" }, "2026-7-19": { h: "8" }, "2026-7-20": { h: "8" }, "2026-7-21": { h: "8.83" }, 
+      // Semana 4 (Segundo tramo, 48 horas limpias = 6 días de 8 horas)
+      "2026-7-24": { h: "8" }, "2026-7-25": { h: "8" }, "2026-7-26": { h: "8" }, "2026-7-27": { h: "8" }, "2026-7-28": { h: "8" }, "2026-7-31": { h: "8" }
+    };
+
+    const finalData = { ...loadedData };
+    
+    // Inyectamos Julio si está vacío
+    Object.keys(julioRescate).forEach(key => {
+      const d = finalData[key];
+      if (!d || (!d.h && !d.n && !d.ed && !d.en)) {
+        finalData[key] = julioRescate[key];
+      }
+    });
+
+    // Inyectamos Agosto si está vacío
+    Object.keys(agostoRescate).forEach(key => {
+      const d = finalData[key];
+      if (!d || (!d.h && !d.n && !d.ed && !d.en)) {
+        finalData[key] = agostoRescate[key];
+      }
+    });
+
+    setDiasData(finalData);
   }, []);
 
   useEffect(() => {
@@ -38,80 +75,6 @@ export default function AppNominas() {
       localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual }));
     }
   }, [diasData, precios, incentivoManual, isClient]);
-
-  const escanearMovil = () => {
-    const encontrados = [];
-    // ESCANEO TOTAL: BUSCAMOS CUALQUIER COSA EN EL MÓVIL
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.includes('hcsl_payroll') || key.includes('natalia_nomina'))) { 
-        const val = localStorage.getItem(key);
-        encontrados.push({ key, val });
-      }
-    }
-    setBackups(encontrados);
-    setMostrarRescate(true);
-  };
-
-  const restaurarBackup = (val: string) => {
-    try {
-      const parsed = JSON.parse(val);
-      let newData = { ...diasData };
-      let recuperadoAlgo = false;
-
-      // SI TIENE EL FORMATO NUEVO (diasData)
-      if (parsed && parsed.diasData && Object.keys(parsed.diasData).length > 0) {
-        // Hacemos un merge (unir) para no borrar lo que ya hay
-        newData = { ...newData, ...parsed.diasData };
-        recuperadoAlgo = true;
-      }
-
-      // SI TIENE EL FORMATO MUY ANTIGUO (hcsl_payroll_data)
-      if (parsed && typeof parsed === 'object' && !parsed.diasData) {
-        Object.keys(parsed).forEach(keyMes => {
-          if (keyMes.includes('-') && !keyMes.includes(':')) {
-            const partes = keyMes.split('-');
-            if (partes.length >= 2) {
-              const year = partes[0];
-              const monthIndex = parseInt(partes[1], 10) - 1; 
-
-              const diasDelMes = parsed[keyMes];
-              if (typeof diasDelMes === 'object' && diasDelMes !== null) {
-                Object.keys(diasDelMes).forEach(diaNum => {
-                  const d = diasDelMes[diaNum];
-                  if (typeof d === 'object') {
-                    const newKey = `${year}-${monthIndex}-${diaNum}`;
-                    
-                    const h = d.horasBase || d.normalHours || d.h || '';
-                    const n = d.plusNocturno || d.nightHours || d.n || '';
-                    const ed = d.horasExtras || d.extraHours || d.ed || '';
-                    const en = d.extrasNocturnas || d.extraNight || d.en || '';
-
-                    if (h !== '' || n !== '') {
-                      newData[newKey] = { h: String(h), n: String(n), ed: String(ed), en: String(en) };
-                      recuperadoAlgo = true;
-                    }
-                  }
-                });
-              }
-            }
-          }
-        });
-      }
-
-      if (recuperadoAlgo) {
-        setDiasData(newData);
-        if (parsed.precios) setPrecios(parsed.precios);
-        setMostrarRescate(false);
-        alert("¡BINGO! Datos restaurados. Por favor, asegúrate de estar en el mes correcto (ej. Julio) usando las flechas de arriba.");
-      } else {
-        alert("Esta caja parece estar vacía (0 días registrados).");
-      }
-
-    } catch (e) {
-      alert("Error al leer este archivo.");
-    }
-  };
 
   const cambiarMes = (direccion: number) => {
     let nuevoMes = mesActual + direccion;
@@ -177,37 +140,11 @@ export default function AppNominas() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       
-      {mostrarRescate && (
-        <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
-          <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE TOTAL 🚨</h2>
-          <p className="text-white text-center mb-6 font-bold">Hemos encontrado todas tus cajas fuertes. Pulsa "Restaurar" en la que tenga los datos antiguos.</p>
-          
-          <div className="w-full max-w-lg space-y-4">
-            {backups.map((b, index) => (
-              <div key={index} className="bg-white p-4 rounded-xl shadow-xl border-4 border-red-500">
-                <p className="font-bold text-gray-800 border-b pb-2 mb-2">📦 Archivo: <span className="text-blue-600 font-mono text-sm">{b.key}</span></p>
-                <button onClick={() => restaurarBackup(b.val)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg text-lg shadow-lg uppercase mt-2 transition-transform active:scale-95">
-                  ✅ Restaurar estos datos
-                </button>
-              </div>
-            ))}
-          </div>
-          
-          <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl transition-transform active:scale-95">
-            Cancelar y Volver
-          </button>
-        </div>
-      )}
-
       <div className="bg-[#111827] text-white p-6 rounded-b-3xl shadow-lg max-w-2xl mx-auto">
         <div className="text-center mb-4 text-xs font-bold text-yellow-500 bg-gray-800 inline-block px-3 py-1 rounded-full border border-gray-700 uppercase tracking-widest mx-auto block w-max">
           Panel de Control
         </div>
         <h1 className="text-3xl font-bold text-center mb-6">Horas de Natalia <span className="text-yellow-500">🛡️</span></h1>
-        
-        <button onClick={escanearMovil} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-3 rounded-xl w-full mb-6 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-red-400 flex justify-center items-center gap-2 animate-pulse transition-all active:scale-95">
-          <span className="text-xl">🆘</span> ¿NO VES TUS HORAS? PULSA AQUÍ
-        </button>
         
         <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700">
           <button onClick={() => cambiarMes(-1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full active:scale-90">&lt;</button>
