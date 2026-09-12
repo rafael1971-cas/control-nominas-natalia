@@ -10,10 +10,10 @@ export default function AppNominas() {
   const [anioActual, setAnioActual] = useState(2026);
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
-  const [precios, setPrecios] = useState({ ordinaria: 9.38, nocturnidad: 1.5, extDia: 12, extNoche: 14 });
+  // PRECIOS ACTUALIZADOS SEGÚN NÓMINA CRIT JUNIO 2026
+  const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
-  // --- SISTEMA DE RESCATE (CON TRADUCTOR UNIVERSAL) ---
   const [mostrarRescate, setMostrarRescate] = useState(false);
   const [backups, setBackups] = useState<any[]>([]);
 
@@ -36,8 +36,6 @@ export default function AppNominas() {
     }
   }, [diasData, precios, incentivoManual, isClient]);
 
-
-  // --- TRADUCTOR DEFINITIVO ---
   const escanearMovil = () => {
     const encontrados = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -57,22 +55,19 @@ export default function AppNominas() {
       let newData = { ...diasData };
       let recuperadoAlgo = false;
 
-      // Intento 1: Formatos nuevos
       if (parsed && parsed.diasData) {
         setDiasData(parsed.diasData);
         if (parsed.precios) setPrecios(parsed.precios);
         recuperadoAlgo = true;
       }
 
-      // Intento 2: Traducir los archivos antiguos (hcsl_payroll_data_v2, etc.)
       if (parsed && typeof parsed === 'object') {
         Object.keys(parsed).forEach(keyMes => {
-          // keyMes suele ser "2026-07"
           if (keyMes.includes('-') && !keyMes.includes(':')) {
             const partes = keyMes.split('-');
             if (partes.length >= 2) {
               const year = partes[0];
-              const monthIndex = parseInt(partes[1], 10) - 1; // "07" pasa a 6 (Julio)
+              const monthIndex = parseInt(partes[1], 10) - 1; 
 
               const diasDelMes = parsed[keyMes];
               if (typeof diasDelMes === 'object' && diasDelMes !== null) {
@@ -81,7 +76,6 @@ export default function AppNominas() {
                   if (typeof d === 'object') {
                     const newKey = `${year}-${monthIndex}-${diaNum}`;
                     
-                    // Traductor de variables viejas a nuevas
                     const h = d.horasBase || d.normalHours || d.h || '';
                     const n = d.plusNocturno || d.nightHours || d.n || '';
                     const ed = d.horasExtras || d.extraHours || d.ed || '';
@@ -150,6 +144,12 @@ export default function AppNominas() {
     setDiasData(prev => ({ ...prev, [clave]: { ...prev[clave], [campo]: valor } }));
   };
 
+  // --- BOTÓN PARA RESETEAR A PRECIOS DE FÁBRICA ---
+  const resetearPrecios = () => {
+      setPrecios({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
+      alert("Precios restaurados a la nómina de CRIT.");
+  };
+
   if (!isClient) return null; 
 
   let totalSalarioMes = 0;
@@ -171,7 +171,6 @@ export default function AppNominas() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       
-      {/* PANTALLA DE RESCATE SUPERPUESTA */}
       {mostrarRescate && (
         <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
           <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE 🚨</h2>
@@ -335,6 +334,10 @@ export default function AppNominas() {
                 </div>
               ))}
             </div>
+            {/* NUEVO BOTON PARA FORZAR LOS PRECIOS REALES SI HACE FALTA */}
+            <button onClick={resetearPrecios} className="mt-6 w-full text-blue-600 font-bold p-3 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+              🔄 Restaurar precios oficiales de la nómina
+            </button>
           </div>
         )}
 
