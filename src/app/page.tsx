@@ -24,7 +24,7 @@ export default function AppNominas() {
   const [prodSemanal, setProdSemanal] = useState<Record<string, number>>({});
   const [incentivoManual, setIncentivoManual] = useState<string>("0");
 
-  // --- SISTEMA DE RESCATE (ARTILLERÍA PESADA) ---
+  // --- SISTEMA DE RESCATE (CON TRADUCTOR UNIVERSAL) ---
   const [mostrarRescate, setMostrarRescate] = useState(false);
   const [backups, setBackups] = useState<any[]>([]);
 
@@ -60,12 +60,12 @@ export default function AppNominas() {
     setIncentivoManual(sumaTotalMes > 0 ? sumaTotalMes.toFixed(2) : "0");
   }, [prodSemanal, anioActual, mesActual]);
 
-  // --- FUNCIONES DEL BOTÓN DEL PÁNICO ---
+  // --- TRADUCTOR DEFINITIVO ---
   const escanearMovil = () => {
     const encontrados = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && !key.includes('v3')) { // Ignoramos el actual que está vacío
+      if (key && !key.includes('v3')) { 
         const val = localStorage.getItem(key);
         encontrados.push({ key, val });
       }
@@ -77,18 +77,62 @@ export default function AppNominas() {
   const restaurarBackup = (val: string) => {
     try {
       const parsed = JSON.parse(val);
+      let newData = { ...diasData };
+      let recuperadoAlgo = false;
+
+      // Intento 1: Formatos nuevos
       if (parsed && parsed.diasData) {
         setDiasData(parsed.diasData);
         if (parsed.precios) setPrecios(parsed.precios);
         if (parsed.prodSemanal) setProdSemanal(parsed.prodSemanal);
-      } else if (parsed && typeof parsed === 'object') {
-        const hasFechas = Object.keys(parsed).some(k => k.includes('-'));
-        if (hasFechas) setDiasData(parsed);
+        recuperadoAlgo = true;
       }
-      setMostrarRescate(false);
-      alert("¡DATOS RECUPERADOS CON ÉXITO! Natalia, ya puedes bajar el arma.");
+
+      // Intento 2: Traducir los archivos antiguos (hcsl_payroll_data_v2, etc.)
+      if (parsed && typeof parsed === 'object') {
+        Object.keys(parsed).forEach(keyMes => {
+          // keyMes suele ser "2026-07"
+          if (keyMes.includes('-') && !keyMes.includes(':')) {
+            const partes = keyMes.split('-');
+            if (partes.length >= 2) {
+              const year = partes[0];
+              const monthIndex = parseInt(partes[1], 10) - 1; // "07" pasa a 6 (Julio)
+
+              const diasDelMes = parsed[keyMes];
+              if (typeof diasDelMes === 'object' && diasDelMes !== null) {
+                Object.keys(diasDelMes).forEach(diaNum => {
+                  const d = diasDelMes[diaNum];
+                  if (typeof d === 'object') {
+                    const newKey = `${year}-${monthIndex}-${diaNum}`;
+                    
+                    // Traductor de variables viejas a nuevas
+                    const h = d.horasBase || d.normalHours || d.h || '';
+                    const n = d.plusNocturno || d.nightHours || d.n || '';
+                    const ed = d.horasExtras || d.extraHours || d.ed || '';
+                    const en = d.extrasNocturnas || d.extraNight || d.en || '';
+
+                    if (h !== '' || n !== '') {
+                      newData[newKey] = { h: String(h), n: String(n), ed: String(ed), en: String(en) };
+                      recuperadoAlgo = true;
+                    }
+                  }
+                });
+              }
+            }
+          }
+        });
+      }
+
+      if (recuperadoAlgo) {
+        setDiasData(newData);
+        setMostrarRescate(false);
+        alert("¡BINGO! Datos antiguos traducidos y restaurados a la perfección. ¡Dile a Rafa que le quites el castigo!");
+      } else {
+        alert("Esa caja fuerte está vacía. Prueba con otra de la lista.");
+      }
+
     } catch (e) {
-      alert("Error al recuperar. Este archivo no parece válido.");
+      alert("Error al leer este archivo.");
     }
   };
 
@@ -169,23 +213,17 @@ export default function AppNominas() {
       {mostrarRescate && (
         <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
           <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE 🚨</h2>
-          <p className="text-white text-center mb-6 font-bold">Hemos encontrado estas cajas fuertes ocultas en la memoria del móvil. Busca la que tenga datos y pulsa Restaurar.</p>
+          <p className="text-white text-center mb-6 font-bold">Busca el archivo "hcsl_payroll_data_v2" y pulsa Restaurar.</p>
           
           <div className="w-full max-w-lg space-y-4">
             {backups.map((b, index) => (
               <div key={index} className="bg-white p-4 rounded-xl shadow-xl border-4 border-red-500">
                 <p className="font-bold text-gray-800 border-b pb-2 mb-2">📦 Archivo encontrado: <span className="text-blue-600">{b.key}</span></p>
-                <p className="text-xs text-gray-500 mb-4 h-12 overflow-hidden">{String(b.val).substring(0, 100)}...</p>
                 <button onClick={() => restaurarBackup(b.val)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg text-lg shadow-lg uppercase">
                   ✅ Restaurar estos datos
                 </button>
               </div>
             ))}
-            {backups.length === 0 && (
-              <div className="bg-white p-6 rounded-xl text-center text-red-600 font-bold">
-                No se han encontrado archivos antiguos en este navegador. ¿Estás en el mismo navegador (Chrome/Safari) que usaste la primera vez?
-              </div>
-            )}
           </div>
           
           <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl">
@@ -194,16 +232,14 @@ export default function AppNominas() {
         </div>
       )}
 
-      {/* HEADER PRINCIPAL */}
       <div className="bg-[#111827] text-white p-6 rounded-b-3xl shadow-lg max-w-2xl mx-auto">
         <div className="text-center mb-4 text-xs font-bold text-yellow-500 bg-gray-800 inline-block px-3 py-1 rounded-full border border-gray-700 uppercase tracking-widest mx-auto block w-max">
           Panel de Control
         </div>
         <h1 className="text-3xl font-bold text-center mb-6">Horas de Natalia <span className="text-yellow-500">🛡️</span></h1>
         
-        {/* BOTÓN DEL PÁNICO */}
         <button onClick={escanearMovil} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-3 rounded-xl w-full mb-6 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-red-400 flex justify-center items-center gap-2 animate-pulse transition-all">
-          <span className="text-xl">🆘</span> ¿NO VES TUS HORAS? PULSA AQUÍ PARA RECUPERARLAS
+          <span className="text-xl">🆘</span> ¿NO VES TUS HORAS? PULSA AQUÍ
         </button>
         
         <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700">
