@@ -18,13 +18,15 @@ export default function AppNominas() {
 
   useEffect(() => {
     setIsClient(true);
-    // VAMOS A LEER LA CAJA FUERTE QUE ESTABA USANDO NATALIA ANTES DE LA VERSIÓN DE SEMANAS
+    // LEE DIRECTAMENTE LA VERSIÓN ORIGINAL MÁS ESTABLE
     const saved = localStorage.getItem('natalia_nomina_v2'); 
     
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.diasData) setDiasData(parsed.diasData);
+        if (parsed.diasData && Object.keys(parsed.diasData).length > 0) {
+           setDiasData(parsed.diasData);
+        }
         if (parsed.precios) setPrecios(parsed.precios);
         if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
       } catch(e){}
@@ -33,17 +35,16 @@ export default function AppNominas() {
 
   useEffect(() => {
     if (isClient) {
-      // GUARDAMOS EN LA MISMA CAJA FUERTE (v2) PARA NO PERDER EL ENLACE CON SUS DATOS
       localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual }));
     }
   }, [diasData, precios, incentivoManual, isClient]);
 
   const escanearMovil = () => {
     const encontrados = [];
+    // ESCANEO TOTAL: BUSCAMOS CUALQUIER COSA EN EL MÓVIL
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      // AHORA MOSTRAMOS TODOS LOS ARCHIVOS QUE NO SEAN EL ACTUAL (v2)
-      if (key && !key.includes('v2')) { 
+      if (key && (key.includes('hcsl_payroll') || key.includes('natalia_nomina'))) { 
         const val = localStorage.getItem(key);
         encontrados.push({ key, val });
       }
@@ -58,13 +59,15 @@ export default function AppNominas() {
       let newData = { ...diasData };
       let recuperadoAlgo = false;
 
-      if (parsed && parsed.diasData) {
-        setDiasData(parsed.diasData);
-        if (parsed.precios) setPrecios(parsed.precios);
+      // SI TIENE EL FORMATO NUEVO (diasData)
+      if (parsed && parsed.diasData && Object.keys(parsed.diasData).length > 0) {
+        // Hacemos un merge (unir) para no borrar lo que ya hay
+        newData = { ...newData, ...parsed.diasData };
         recuperadoAlgo = true;
       }
 
-      if (parsed && typeof parsed === 'object') {
+      // SI TIENE EL FORMATO MUY ANTIGUO (hcsl_payroll_data)
+      if (parsed && typeof parsed === 'object' && !parsed.diasData) {
         Object.keys(parsed).forEach(keyMes => {
           if (keyMes.includes('-') && !keyMes.includes(':')) {
             const partes = keyMes.split('-');
@@ -98,10 +101,11 @@ export default function AppNominas() {
 
       if (recuperadoAlgo) {
         setDiasData(newData);
+        if (parsed.precios) setPrecios(parsed.precios);
         setMostrarRescate(false);
-        alert("¡BINGO! Datos antiguos traducidos y restaurados a la perfección.");
+        alert("¡BINGO! Datos restaurados. Por favor, asegúrate de estar en el mes correcto (ej. Julio) usando las flechas de arriba.");
       } else {
-        alert("Esa caja fuerte está vacía o no tiene formato válido.");
+        alert("Esta caja parece estar vacía (0 días registrados).");
       }
 
     } catch (e) {
@@ -175,26 +179,21 @@ export default function AppNominas() {
       
       {mostrarRescate && (
         <div className="fixed inset-0 bg-red-900 z-50 p-6 overflow-y-auto flex flex-col items-center">
-          <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE 🚨</h2>
-          <p className="text-white text-center mb-6 font-bold">Busca el archivo de datos y pulsa Restaurar.</p>
+          <h2 className="text-3xl font-black text-white mb-4 text-center mt-10">🚨 MODO RESCATE TOTAL 🚨</h2>
+          <p className="text-white text-center mb-6 font-bold">Hemos encontrado todas tus cajas fuertes. Pulsa "Restaurar" en la que tenga los datos antiguos.</p>
           
           <div className="w-full max-w-lg space-y-4">
             {backups.map((b, index) => (
               <div key={index} className="bg-white p-4 rounded-xl shadow-xl border-4 border-red-500">
-                <p className="font-bold text-gray-800 border-b pb-2 mb-2">📦 Archivo encontrado: <span className="text-blue-600">{b.key}</span></p>
-                <button onClick={() => restaurarBackup(b.val)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg text-lg shadow-lg uppercase">
+                <p className="font-bold text-gray-800 border-b pb-2 mb-2">📦 Archivo: <span className="text-blue-600 font-mono text-sm">{b.key}</span></p>
+                <button onClick={() => restaurarBackup(b.val)} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg text-lg shadow-lg uppercase mt-2 transition-transform active:scale-95">
                   ✅ Restaurar estos datos
                 </button>
               </div>
             ))}
-            {backups.length === 0 && (
-              <div className="bg-white p-6 rounded-xl text-center text-red-600 font-bold">
-                No hay otros archivos de respaldo en este navegador, los datos actuales se están leyendo de 'natalia_nomina_v2'.
-              </div>
-            )}
           </div>
           
-          <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl">
+          <button onClick={() => setMostrarRescate(false)} className="mt-8 bg-gray-800 hover:bg-gray-700 text-white font-bold px-8 py-4 rounded-full border border-gray-600 shadow-xl transition-transform active:scale-95">
             Cancelar y Volver
           </button>
         </div>
@@ -206,14 +205,14 @@ export default function AppNominas() {
         </div>
         <h1 className="text-3xl font-bold text-center mb-6">Horas de Natalia <span className="text-yellow-500">🛡️</span></h1>
         
-        <button onClick={escanearMovil} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-3 rounded-xl w-full mb-6 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-red-400 flex justify-center items-center gap-2 animate-pulse transition-all">
+        <button onClick={escanearMovil} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-3 rounded-xl w-full mb-6 shadow-[0_0_15px_rgba(220,38,38,0.5)] border-2 border-red-400 flex justify-center items-center gap-2 animate-pulse transition-all active:scale-95">
           <span className="text-xl">🆘</span> ¿NO VES TUS HORAS? PULSA AQUÍ
         </button>
         
         <div className="flex justify-between items-center bg-gray-800 rounded-full px-6 py-3 border border-gray-700">
-          <button onClick={() => cambiarMes(-1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full">&lt;</button>
+          <button onClick={() => cambiarMes(-1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full active:scale-90">&lt;</button>
           <span className="font-bold text-lg tracking-widest text-yellow-400">{NOMBRES_MESES[mesActual]} {anioActual}</span>
-          <button onClick={() => cambiarMes(1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full">&gt;</button>
+          <button onClick={() => cambiarMes(1)} className="text-gray-400 hover:text-white text-xl p-2 font-bold px-4 bg-gray-700 rounded-full active:scale-90">&gt;</button>
         </div>
       </div>
 
