@@ -3,10 +3,6 @@ import React, { useState, useEffect } from 'react';
 
 const NOMBRES_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-// --- CREDENCIALES DE SUPABASE ---
-const SUPABASE_URL = "https://kkgaaccxdorqumzsprjv.supabase.co/rest/v1/productividad_natalia";
-const SUPABASE_KEY = "sb_publishable_lYdelNOdfdQbsejEsKjImA_cXjLkryV";
-
 // --- FUNCIÓN PARA CALCULAR EL NÚMERO DE SEMANA REAL (ISO 8601) ---
 const getNumeroSemana = (fecha: Date) => {
   const date = new Date(fecha.getTime());
@@ -26,15 +22,9 @@ export default function AppNominas() {
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
   const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
-  const [incentivoManual, setIncentivoManual] = useState<string>("0");
+  
   const [ingresoBanco, setIngresoBanco] = useState<string>("");
-
-  // --- ESTADOS NUEVOS PARA POWERBI (SUPABASE) ---
-  const [semanasPowerBI, setSemanasPowerBI] = useState<any[]>([]);
-  const [totalPagadoSupabase, setTotalPagadoSupabase] = useState<number>(0);
-  const [inputSemana, setInputSemana] = useState("");
-  const [inputGenerado, setInputGenerado] = useState("");
-  const [inputPagado, setInputPagado] = useState("");
+  const [ingresoProductividad, setIngresoProductividad] = useState<string>(""); // Nuevo estado para la ETT
 
   useEffect(() => {
     setIsClient(true);
@@ -46,8 +36,8 @@ export default function AppNominas() {
         const parsed = JSON.parse(saved);
         if (parsed.diasData) loadedData = parsed.diasData;
         if (parsed.precios) setPrecios(parsed.precios);
-        if (parsed.incentivoManual !== undefined) setIncentivoManual(parsed.incentivoManual);
         if (parsed.ingresoBanco !== undefined) setIngresoBanco(parsed.ingresoBanco);
+        if (parsed.ingresoProductividad !== undefined) setIngresoProductividad(parsed.ingresoProductividad);
       } catch(e){}
     }
 
@@ -82,117 +72,9 @@ export default function AppNominas() {
 
   useEffect(() => {
     if (isClient) {
-      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, incentivoManual, ingresoBanco }));
+      localStorage.setItem('natalia_nomina_v2', JSON.stringify({ diasData, precios, ingresoBanco, ingresoProductividad }));
     }
-  }, [diasData, precios, incentivoManual, ingresoBanco, isClient]);
-
-  // --- LÓGICA DE CONEXIÓN A SUPABASE (NUEVO) ---
-  const fetchProductividad = async () => {
-    const mesStr = `${anioActual}-${mesActual}`;
-    try {
-      const res = await fetch(`${SUPABASE_URL}?mes_año=eq.${mesStr}`, {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-      const data = await res.json();
-      let semanas: any[] = [];
-      let pagado = 0;
-      
-      if (Array.isArray(data)) {
-        data.forEach((item: any) => {
-          if (item.semana === 'TOTAL_NOMINA') {
-            pagado = parseFloat(item.importe_pagado) || 0;
-          } else {
-            semanas.push(item);
-          }
-        });
-      }
-      
-      semanas.sort((a, b) => a.semana.localeCompare(b.semana));
-      setSemanasPowerBI(semanas);
-      setTotalPagadoSupabase(pagado);
-    } catch (error) {
-      console.error("Error al cargar Supabase:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (isClient) {
-      fetchProductividad();
-    }
-  }, [isClient, mesActual, anioActual]);
-
-  const guardarSemanaSupabase = async () => {
-    if (!inputSemana || !inputGenerado) return alert("Rellena el nombre de la semana y los euros generados.");
-    const mesStr = `${anioActual}-${mesActual}`;
-    try {
-      await fetch(SUPABASE_URL, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          mes_año: mesStr,
-          semana: inputSemana,
-          importe_generado: parseFloat(inputGenerado)
-        })
-      });
-      setInputSemana("");
-      setInputGenerado("");
-      fetchProductividad();
-    } catch (error) {
-      console.error("Error al guardar semana:", error);
-      alert("Error al guardar la semana. Revisa la conexión.");
-    }
-  };
-
-  const guardarPagadoSupabase = async () => {
-    if (!inputPagado) return alert("Introduce la cantidad que le pagaron en nómina por productividad.");
-    const mesStr = `${anioActual}-${mesActual}`;
-    try {
-      await fetch(`${SUPABASE_URL}?on_conflict=mes_año,semana`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates,return=minimal'
-        },
-        body: JSON.stringify({
-          mes_año: mesStr,
-          semana: 'TOTAL_NOMINA',
-          importe_pagado: parseFloat(inputPagado)
-        })
-      });
-      setInputPagado("");
-      fetchProductividad();
-    } catch (error) {
-      console.error("Error al guardar el pago:", error);
-      alert("Error al guardar el pago. Revisa la conexión.");
-    }
-  };
-
-  const eliminarSemanaSupabase = async (id: string) => {
-    if (!confirm("¿Estás seguro de que quieres borrar esta fila de PowerBI?")) return;
-    try {
-      await fetch(`${SUPABASE_URL}?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        }
-      });
-      fetchProductividad();
-    } catch (error) {
-      console.error("Error al borrar:", error);
-    }
-  };
-  // ---------------------------------------------
+  }, [diasData, precios, ingresoBanco, ingresoProductividad, isClient]);
 
   const cambiarMes = (direccion: number) => {
     let nuevoMes = mesActual + direccion;
@@ -202,6 +84,7 @@ export default function AppNominas() {
     setMesActual(nuevoMes);
     setAnioActual(nuevoAnio);
     setIngresoBanco("");
+    setIngresoProductividad("");
   };
 
   const diasDelMes = new Date(anioActual, mesActual + 1, 0).getDate();
@@ -210,15 +93,17 @@ export default function AppNominas() {
 
   for (let i = 1; i <= diasDelMes; i++) {
     const diaClave = `${anioActual}-${mesActual}-${i}`;
-    const datosDia = diasData[diaClave] || { h: '', n: '', ed: '', en: '' };
+    const datosDia = diasData[diaClave] || { h: '', n: '', ed: '', en: '', p: '' };
     
     if (Number(datosDia.h) > 0 || Number(datosDia.n) > 0) totalDiasTrabajadosMes++;
 
+    // Se suma la columna de productividad diaria (p) al total del día
     const totalDiaEuros = (
         (Number(datosDia.h) || 0) * precios.ordinaria +
         (Number(datosDia.n) || 0) * precios.nocturnidad +
         (Number(datosDia.ed) || 0) * precios.extDia +
-        (Number(datosDia.en) || 0) * precios.extNoche
+        (Number(datosDia.en) || 0) * precios.extNoche +
+        (Number(datosDia.p) || 0)
     );
 
     // Calculamos la semana real a la que pertenece este día
@@ -240,6 +125,8 @@ export default function AppNominas() {
   if (!isClient) return null; 
 
   let totalSalarioMes = 0;
+  let totalProductividadMes = 0;
+  
   Object.keys(diasData).forEach(clave => {
       if (clave.startsWith(`${anioActual}-${mesActual}-`)) {
           const d = diasData[clave];
@@ -247,16 +134,22 @@ export default function AppNominas() {
                              (Number(d.n) || 0) * precios.nocturnidad +
                              (Number(d.ed) || 0) * precios.extDia +
                              (Number(d.en) || 0) * precios.extNoche;
+          
+          totalProductividadMes += (Number(d.p) || 0); // Suma automática de la productividad
       }
   });
 
-  const incentivoFinal = Number(incentivoManual) || 0;
-  const salarioBruto = totalSalarioMes + incentivoFinal;
-  
+  const salarioBruto = totalSalarioMes + totalProductividadMes;
   const retencionIRPF = salarioBruto * 0.02;
   const retencionSS = salarioBruto * 0.0655;
   const salarioNetoCalculado = salarioBruto - retencionIRPF - retencionSS;
 
+  // Cálculos desglosados (Neto solo de horas y Neto solo de productividad)
+  const TASA_DESCUENTOS = 0.0855; // 2% IRPF + 6.55% SS
+  const netoSoloHoras = totalSalarioMes - (totalSalarioMes * TASA_DESCUENTOS);
+  const netoProductividad = totalProductividadMes - (totalProductividadMes * TASA_DESCUENTOS);
+
+  // --- COMPROBADOR GLOBAL DE BANCO ---
   const ingresoNum = Number(ingresoBanco) || 0;
   const diferencia = ingresoNum - salarioNetoCalculado;
   
@@ -280,6 +173,30 @@ export default function AppNominas() {
     }
   }
 
+  // --- COMPROBADOR ESPECÍFICO DE PRODUCTIVIDAD ---
+  const prodNum = Number(ingresoProductividad) || 0;
+  const diferenciaProd = prodNum - totalProductividadMes;
+  
+  let colorFondoProd = "bg-gray-100";
+  let colorTextoProd = "text-gray-500";
+  let mensajeComparacionProd = "Introduce la gratificación de la nómina";
+
+  if (ingresoProductividad !== "") {
+    if (Math.abs(diferenciaProd) <= 0.50) { 
+      colorFondoProd = "bg-green-100 border-green-500";
+      colorTextoProd = "text-green-700";
+      mensajeComparacionProd = "✅ PRODUCTIVIDAD CORRECTA.";
+    } else if (diferenciaProd < -0.50) {
+      colorFondoProd = "bg-red-100 border-red-500";
+      colorTextoProd = "text-red-700";
+      mensajeComparacionProd = `❌ TE HAN ROBADO ${Math.abs(diferenciaProd).toFixed(2)} € DE PRODUCTIVIDAD.`;
+    } else if (diferenciaProd > 0.50) {
+      colorFondoProd = "bg-blue-100 border-blue-500";
+      colorTextoProd = "text-blue-700";
+      mensajeComparacionProd = `🔵 TE SOBRAN ${Math.abs(diferenciaProd).toFixed(2)} €.`;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       <div className="bg-[#111827] text-white p-6 rounded-b-3xl shadow-lg max-w-2xl mx-auto">
@@ -298,7 +215,6 @@ export default function AppNominas() {
       <div className="flex flex-wrap justify-center mt-6 gap-2 px-4 max-w-2xl mx-auto">
         <button onClick={() => setTab('fichaje')} className={`px-4 py-2 rounded-full font-bold text-sm shadow transition-colors ${tab === 'fichaje' ? 'bg-yellow-500 text-gray-900' : 'bg-white text-gray-500 border'}`}>📅 Fichaje Diario</button>
         <button onClick={() => setTab('nomina')} className={`px-4 py-2 rounded-full font-bold text-sm shadow transition-colors ${tab === 'nomina' ? 'bg-yellow-500 text-gray-900' : 'bg-white text-gray-500 border'}`}>📄 Hacer Nómina</button>
-        <button onClick={() => setTab('powerbi')} className={`px-4 py-2 rounded-full font-bold text-sm shadow transition-colors ${tab === 'powerbi' ? 'bg-yellow-500 text-gray-900' : 'bg-white text-gray-500 border'}`}>📊 PowerBI</button>
         <button onClick={() => setTab('precios')} className={`px-4 py-2 rounded-full font-bold text-sm shadow transition-colors ${tab === 'precios' ? 'bg-yellow-500 text-gray-900' : 'bg-white text-gray-500 border'}`}>⚙️ Precios</button>
       </div>
 
@@ -312,18 +228,18 @@ export default function AppNominas() {
               <span className="bg-blue-100 text-blue-800 font-bold px-4 py-1 rounded-full text-sm">Días trabajados: {totalDiasTrabajadosMes}</span>
             </div>
 
-            <div className="hidden md:grid grid-cols-6 gap-2 bg-[#111827] text-yellow-500 font-bold text-[10px] uppercase p-3 rounded-xl mb-4 text-center items-center">
+            <div className="hidden md:grid grid-cols-7 gap-2 bg-[#111827] text-yellow-500 font-bold text-[10px] uppercase p-3 rounded-xl mb-4 text-center items-center">
               <div>Día</div>
               <div>Total Turno (H)</div>
               <div>Plus Noct. (H)</div>
               <div>Ext. Día</div>
               <div>Ext. Noche</div>
+              <div>Prod. (€)</div>
               <div>Total Día</div>
             </div>
 
             <div className="border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                 {diasRender.map((d: any, index: number) => {
-                  // Comprobamos si hay que poner el cartel amarillo separador de semana
                   const mostrarCartel = index === 0 || d.semana !== diasRender[index - 1].semana;
                   
                   return (
@@ -333,7 +249,7 @@ export default function AppNominas() {
                           Semana {d.semana}
                         </div>
                       )}
-                      <div className={`grid grid-cols-2 md:grid-cols-6 gap-2 p-3 items-center border-b border-gray-50 bg-white hover:bg-yellow-50/30 transition-colors`}>
+                      <div className={`grid grid-cols-2 md:grid-cols-7 gap-2 p-3 items-center border-b border-gray-50 bg-white hover:bg-yellow-50/30 transition-colors`}>
                         
                         <div className="flex items-center space-x-3 col-span-2 md:col-span-1">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-yellow-400 text-gray-900 shadow-sm`}>
@@ -356,6 +272,12 @@ export default function AppNominas() {
                         <div className="flex flex-col md:block">
                             <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Ext. Noche</span>
                             <input type="number" placeholder="0" value={d.datos.en} onChange={e => updateDia(d.clave, 'en', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
+                        </div>
+
+                        {/* NUEVA COLUMNA: PRODUCTIVIDAD DIARIA */}
+                        <div className="flex flex-col md:block">
+                            <span className="text-[10px] font-bold text-yellow-600 md:hidden mb-1">Prod. (€)</span>
+                            <input type="number" placeholder="0" value={d.datos.p || ''} onChange={e => updateDia(d.clave, 'p', e.target.value)} className="w-full text-center border-2 border-yellow-200 bg-yellow-50 rounded-xl p-2 font-bold text-yellow-800 focus:border-yellow-500 focus:ring-0 outline-none" />
                         </div>
 
                         <div className="col-span-2 md:col-span-1 text-center font-bold text-gray-800 text-lg mt-2 md:mt-0 bg-gray-50 md:bg-transparent rounded-xl p-2 md:p-0">
@@ -381,11 +303,8 @@ export default function AppNominas() {
               </div>
 
               <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <span className="text-yellow-700 font-bold uppercase text-xs">Incentivo Producción</span>
-                <div className="flex items-center">
-                    <input type="number" value={incentivoManual} onChange={(e) => setIncentivoManual(e.target.value)} className="w-20 text-right border-2 border-yellow-300 bg-white rounded-md p-1 font-bold text-gray-800 outline-none" />
-                    <span className="ml-1 font-bold text-yellow-600">€</span>
-                </div>
+                <span className="text-yellow-700 font-bold uppercase text-xs">Incentivo Producción (Suma del mes)</span>
+                <span className="font-black text-lg text-yellow-800">{totalProductividadMes.toFixed(2)} €</span>
               </div>
 
               <div className="flex justify-between items-center p-4 bg-gray-100 rounded-xl border-2 border-gray-300 shadow-sm">
@@ -404,122 +323,68 @@ export default function AppNominas() {
               </div>
             </div>
 
+            {/* RECUADROS INFORMATIVOS DESGLOSADOS */}
+            <div className="flex flex-col md:flex-row gap-3 mt-6">
+              <div className="flex-1 bg-gray-100 p-4 rounded-xl border border-gray-300 text-center shadow-sm">
+                <span className="block text-gray-500 font-bold uppercase text-[10px] mb-1 tracking-wider">Neto (Solo Horas)</span>
+                <span className="text-xl font-black text-gray-800">{netoSoloHoras.toFixed(2)} €</span>
+              </div>
+              <div className="flex-1 bg-yellow-50 p-4 rounded-xl border border-yellow-300 text-center shadow-sm">
+                <span className="block text-yellow-600 font-bold uppercase text-[10px] mb-1 tracking-wider">Neto (Productividad)</span>
+                <span className="text-xl font-black text-yellow-800">{netoProductividad.toFixed(2)} €</span>
+              </div>
+            </div>
+
             <div className="mt-6 bg-[#111827] rounded-2xl p-6 text-center shadow-lg">
               <span className="block text-yellow-500 font-bold uppercase tracking-widest text-xs mb-1">Lo que debería llegar al banco</span>
               <span className="text-4xl font-extrabold text-white">{salarioNetoCalculado.toFixed(2)} €</span>
             </div>
 
-            <div className="mt-8 border-t pt-6">
-              <h3 className="text-center font-bold text-gray-700 mb-4 uppercase tracking-wider text-sm">¿Cuánto te han ingresado?</h3>
-              <div className="flex justify-center mb-4">
-                <input 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={ingresoBanco} 
-                  onChange={(e) => setIngresoBanco(e.target.value)}
-                  className="w-40 text-center border-2 border-blue-400 bg-white rounded-xl p-3 font-black text-blue-900 text-xl outline-none shadow-inner"
-                />
-                <span className="ml-2 font-black text-blue-900 text-2xl self-center">€</span>
+            {/* ZONAS DE COMPROBACIÓN DOBLE */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 border-t pt-6">
+              
+              {/* Comprobador 1: Banco */}
+              <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                <h3 className="text-center font-bold text-blue-800 mb-4 uppercase tracking-wider text-xs">1. Comprobar Total Banco</h3>
+                <div className="flex justify-center mb-4">
+                  <input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={ingresoBanco} 
+                    onChange={(e) => setIngresoBanco(e.target.value)}
+                    className="w-full max-w-[120px] text-center border-2 border-blue-300 bg-white rounded-xl p-2 font-black text-blue-900 text-lg outline-none shadow-inner"
+                  />
+                  <span className="ml-2 font-black text-blue-900 text-xl self-center">€</span>
+                </div>
+                <div className={`p-3 rounded-xl text-center font-bold text-sm border-2 transition-colors duration-300 ${colorFondo}`}>
+                  <span className={colorTexto}>{mensajeComparacion}</span>
+                </div>
               </div>
 
-              <div className={`p-4 rounded-xl text-center font-bold border-2 transition-colors duration-300 ${colorFondo}`}>
-                <span className={colorTexto}>{mensajeComparacion}</span>
+              {/* Comprobador 2: Productividad */}
+              <div className="bg-yellow-50/50 p-4 rounded-2xl border border-yellow-200">
+                <h3 className="text-center font-bold text-yellow-800 mb-4 uppercase tracking-wider text-xs">2. Comprobar Productividad</h3>
+                <div className="flex justify-center mb-4">
+                  <input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={ingresoProductividad} 
+                    onChange={(e) => setIngresoProductividad(e.target.value)}
+                    className="w-full max-w-[120px] text-center border-2 border-yellow-400 bg-white rounded-xl p-2 font-black text-yellow-900 text-lg outline-none shadow-inner"
+                  />
+                  <span className="ml-2 font-black text-yellow-900 text-xl self-center">€</span>
+                </div>
+                <div className={`p-3 rounded-xl text-center font-bold text-sm border-2 transition-colors duration-300 ${colorFondoProd}`}>
+                  <span className={colorTextoProd}>{mensajeComparacionProd}</span>
+                </div>
               </div>
+
             </div>
 
           </div>
         )}
 
-        {/* === PESTAÑA 3: POWERBI (NUEVA INTEGRACIÓN SUPABASE) === */}
-        {tab === 'powerbi' && (
-          <div className="bg-white rounded-2xl shadow-xl p-4 md:p-6 border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4 text-center">💰 Control PowerBI: {NOMBRES_MESES[mesActual]}</h2>
-
-            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
-                <h4 className="font-bold text-gray-700 mb-3 uppercase text-xs tracking-wider">1. Añadir bloques de PowerBI</h4>
-                <div className="flex flex-col md:flex-row gap-3">
-                    <input type="text" placeholder="Ej: Semana 30-34" value={inputSemana} onChange={e => setInputSemana(e.target.value)} className="flex-1 border-2 border-gray-200 rounded-xl p-2 font-bold focus:border-yellow-500 outline-none text-center md:text-left" />
-                    <div className="flex justify-center">
-                        <input type="number" placeholder="Euros" value={inputGenerado} onChange={e => setInputGenerado(e.target.value)} step="0.01" className="w-28 border-2 border-r-0 border-gray-200 rounded-l-xl p-2 font-bold text-center focus:border-yellow-500 outline-none" />
-                        <span className="bg-gray-200 border-2 border-l-0 border-gray-200 rounded-r-xl px-3 flex items-center font-bold text-gray-600">€</span>
-                    </div>
-                    <button onClick={guardarSemanaSupabase} className="bg-yellow-500 text-gray-900 font-bold px-4 py-2 rounded-xl shadow hover:bg-yellow-400 active:scale-95 transition">Guardar</button>
-                </div>
-            </div>
-
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
-                <h4 className="font-bold text-blue-800 mb-3 uppercase text-xs tracking-wider">2. Productividad en Nómina Oficial</h4>
-                <div className="flex flex-col md:flex-row gap-3">
-                    <div className="flex flex-1 justify-center">
-                        <input type="number" placeholder="Ingresado en nómina" value={inputPagado} onChange={e => setInputPagado(e.target.value)} step="0.01" className="w-full border-2 border-r-0 border-blue-200 rounded-l-xl p-2 font-bold text-blue-900 text-center focus:border-blue-500 outline-none" />
-                        <span className="bg-blue-200 border-2 border-l-0 border-blue-200 rounded-r-xl px-3 flex items-center font-bold text-blue-800">€</span>
-                    </div>
-                    <button onClick={guardarPagadoSupabase} className="bg-blue-600 text-white font-bold px-4 py-2 rounded-xl shadow hover:bg-blue-500 active:scale-95 transition">Registrar Pago</button>
-                </div>
-            </div>
-
-            <hr className="my-6 border-gray-200" />
-            
-            <h4 className="font-bold text-gray-700 mb-4 uppercase text-sm tracking-wider text-center">📊 Resumen del Mes de PowerBI</h4>
-            
-            <ul className="space-y-2 mb-6">
-                {semanasPowerBI.length === 0 && <li className="text-center text-gray-400 italic text-sm py-4">No hay semanas registradas este mes en la nube</li>}
-                {semanasPowerBI.map(s => (
-                    <li key={s.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 shadow-sm">
-                        <span className="font-bold text-gray-700 uppercase text-sm">{s.semana}</span>
-                        <div className="flex items-center gap-4">
-                            <span className="font-black text-gray-900">{parseFloat(s.importe_generado).toFixed(2)} €</span>
-                            <button onClick={() => eliminarSemanaSupabase(s.id)} className="text-red-500 hover:bg-red-500 hover:text-white font-bold px-3 py-1 border border-red-200 rounded-md text-xs transition-colors">BORRAR</button>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-
-            {(() => {
-                const totalGen = semanasPowerBI.reduce((acc, curr) => acc + parseFloat(curr.importe_generado || 0), 0);
-                const diferencia = totalGen - totalPagadoSupabase;
-                
-                let colorCaja = "bg-gray-100 border-gray-300";
-                let textoDeuda = "Introduce datos para comparar";
-                let colorTexto = "text-gray-600";
-
-                if (totalGen > 0 || totalPagadoSupabase > 0) {
-                    if (Math.abs(diferencia) <= 0.05) {
-                        colorCaja = "bg-green-100 border-green-500";
-                        textoDeuda = "✅ CUENTAS CUADRADAS";
-                        colorTexto = "text-green-700";
-                    } else if (diferencia > 0.05) {
-                        colorCaja = "bg-red-100 border-red-500";
-                        textoDeuda = `❌ FALTAN ${diferencia.toFixed(2)} €`;
-                        colorTexto = "text-red-700";
-                    } else {
-                        colorCaja = "bg-blue-100 border-blue-500";
-                        textoDeuda = `🔵 PAGARON DE MÁS: ${Math.abs(diferencia).toFixed(2)} €`;
-                        colorTexto = "text-blue-700";
-                    }
-                }
-
-                return (
-                    <div>
-                        <div className="flex justify-between items-center p-3 bg-gray-100 rounded-lg border border-gray-200 mb-2">
-                            <span className="font-semibold text-gray-600 text-sm">Total Generado (App PowerBI):</span>
-                            <span className="font-bold text-gray-800">{totalGen.toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border border-blue-100 mb-4">
-                            <span className="font-semibold text-blue-800 text-sm">Total Cobrado (Nómina ETT):</span>
-                            <span className="font-bold text-blue-900">{totalPagadoSupabase.toFixed(2)} €</span>
-                        </div>
-                        
-                        <div className={`p-4 rounded-xl text-center font-black text-xl border-2 shadow-inner ${colorCaja} ${colorTexto}`}>
-                            {textoDeuda}
-                        </div>
-                    </div>
-                );
-            })()}
-          </div>
-        )}
-
-        {/* === PESTAÑA 4: PRECIOS === */}
+        {/* === PESTAÑA 3: PRECIOS === */}
         {tab === 'precios' && (
           <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
             <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Configuración de Precios ETT</h2>
