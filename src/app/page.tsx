@@ -7,9 +7,20 @@ const NOMBRES_MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "J
 const SUPABASE_URL = "https://kkgaaccxdorqumzsprjv.supabase.co/rest/v1/productividad_natalia";
 const SUPABASE_KEY = "sb_publishable_lYdelNOdfdQbsejEsKjImA_cXjLkryV";
 
+// --- FUNCIÓN PARA CALCULAR EL NÚMERO DE SEMANA REAL (ISO 8601) ---
+const getNumeroSemana = (fecha: Date) => {
+  const date = new Date(fecha.getTime());
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+};
+
 export default function AppNominas() {
   const [isClient, setIsClient] = useState(false);
   const [tab, setTab] = useState('nomina');
+  
+  // Arranca automáticamente en el mes y año actuales reales
   const [mesActual, setMesActual] = useState(new Date().getMonth());
   const [anioActual, setAnioActual] = useState(new Date().getFullYear());
 
@@ -99,7 +110,6 @@ export default function AppNominas() {
         });
       }
       
-      // Ordenar por nombre de semana alfabéticamente
       semanas.sort((a, b) => a.semana.localeCompare(b.semana));
       setSemanasPowerBI(semanas);
       setTotalPagadoSupabase(pagado);
@@ -211,7 +221,11 @@ export default function AppNominas() {
         (Number(datosDia.en) || 0) * precios.extNoche
     );
 
-    diasRender.push({ diaNum: i, clave: diaClave, datos: datosDia, totalEuros: totalDiaEuros });
+    // Calculamos la semana real a la que pertenece este día
+    const fechaActual = new Date(anioActual, mesActual, i);
+    const numeroSemana = getNumeroSemana(fechaActual);
+
+    diasRender.push({ diaNum: i, clave: diaClave, datos: datosDia, totalEuros: totalDiaEuros, semana: numeroSemana });
   }
 
   const updateDia = (clave: string, campo: string, valor: string) => {
@@ -308,37 +322,49 @@ export default function AppNominas() {
             </div>
 
             <div className="border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                {diasRender.map((d: any) => (
-                  <div key={d.diaNum} className={`grid grid-cols-2 md:grid-cols-6 gap-2 p-3 items-center border-b border-gray-50 bg-white hover:bg-yellow-50/30 transition-colors`}>
-                    
-                    <div className="flex items-center space-x-3 col-span-2 md:col-span-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-yellow-400 text-gray-900 shadow-sm`}>
-                        {d.diaNum}
+                {diasRender.map((d: any, index: number) => {
+                  // Comprobamos si hay que poner el cartel amarillo separador de semana
+                  const mostrarCartel = index === 0 || d.semana !== diasRender[index - 1].semana;
+                  
+                  return (
+                    <React.Fragment key={d.diaNum}>
+                      {mostrarCartel && (
+                        <div className="bg-yellow-100 border-y border-yellow-300 p-2 text-center text-yellow-800 font-black uppercase text-sm tracking-widest shadow-inner">
+                          Semana {d.semana}
+                        </div>
+                      )}
+                      <div className={`grid grid-cols-2 md:grid-cols-6 gap-2 p-3 items-center border-b border-gray-50 bg-white hover:bg-yellow-50/30 transition-colors`}>
+                        
+                        <div className="flex items-center space-x-3 col-span-2 md:col-span-1">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-yellow-400 text-gray-900 shadow-sm`}>
+                            {d.diaNum}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col md:block">
+                            <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Turno Base</span>
+                            <input type="number" placeholder="0" value={d.datos.h} onChange={e => updateDia(d.clave, 'h', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
+                        </div>
+                        <div className="flex flex-col md:block">
+                            <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Plus Noct.</span>
+                            <input type="number" placeholder="0" value={d.datos.n} onChange={e => updateDia(d.clave, 'n', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
+                        </div>
+                        <div className="flex flex-col md:block">
+                            <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Ext. Día</span>
+                            <input type="number" placeholder="0" value={d.datos.ed} onChange={e => updateDia(d.clave, 'ed', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
+                        </div>
+                        <div className="flex flex-col md:block">
+                            <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Ext. Noche</span>
+                            <input type="number" placeholder="0" value={d.datos.en} onChange={e => updateDia(d.clave, 'en', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
+                        </div>
+
+                        <div className="col-span-2 md:col-span-1 text-center font-bold text-gray-800 text-lg mt-2 md:mt-0 bg-gray-50 md:bg-transparent rounded-xl p-2 md:p-0">
+                          {d.totalEuros > 0 ? `${d.totalEuros.toFixed(2)} €` : '-'}
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex flex-col md:block">
-                        <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Turno Base</span>
-                        <input type="number" placeholder="0" value={d.datos.h} onChange={e => updateDia(d.clave, 'h', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
-                    </div>
-                    <div className="flex flex-col md:block">
-                        <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Plus Noct.</span>
-                        <input type="number" placeholder="0" value={d.datos.n} onChange={e => updateDia(d.clave, 'n', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
-                    </div>
-                    <div className="flex flex-col md:block">
-                        <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Ext. Día</span>
-                        <input type="number" placeholder="0" value={d.datos.ed} onChange={e => updateDia(d.clave, 'ed', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
-                    </div>
-                    <div className="flex flex-col md:block">
-                        <span className="text-[10px] font-bold text-gray-400 md:hidden mb-1">Ext. Noche</span>
-                        <input type="number" placeholder="0" value={d.datos.en} onChange={e => updateDia(d.clave, 'en', e.target.value)} className="w-full text-center border-2 border-gray-200 rounded-xl p-2 font-bold text-gray-700 focus:border-yellow-400 focus:ring-0 outline-none" />
-                    </div>
-
-                    <div className="col-span-2 md:col-span-1 text-center font-bold text-gray-800 text-lg mt-2 md:mt-0 bg-gray-50 md:bg-transparent rounded-xl p-2 md:p-0">
-                      {d.totalEuros > 0 ? `${d.totalEuros.toFixed(2)} €` : '-'}
-                    </div>
-                  </div>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
             </div>
           </div>
         )}
