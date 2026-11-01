@@ -10,8 +10,8 @@ const SUPABASE_KEY = "sb_publishable_lYdelNOdfdQbsejEsKjImA_cXjLkryV";
 export default function AppNominas() {
   const [isClient, setIsClient] = useState(false);
   const [tab, setTab] = useState('nomina');
-  const [mesActual, setMesActual] = useState(7);
-  const [anioActual, setAnioActual] = useState(2026);
+  const [mesActual, setMesActual] = useState(new Date().getMonth());
+  const [anioActual, setAnioActual] = useState(new Date().getFullYear());
 
   const [diasData, setDiasData] = useState<Record<string, any>>({});
   const [precios, setPrecios] = useState({ ordinaria: 11.60, nocturnidad: 2.49, extDia: 18.06, extNoche: 20.55 });
